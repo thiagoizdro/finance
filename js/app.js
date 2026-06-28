@@ -699,3 +699,11 @@ if (document.readyState === 'loading') {
 }
 
 console.log('📱 App carregado!');
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/finance/service-worker.js')
+            .then(reg => console.log('SW registrado!', reg))
+            .catch(err => console.error('Erro no registro:', err));
+    });
+}

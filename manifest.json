@@ -1,11 +1,12 @@
 {
-  "name": "Finance App",
+  "name": "Seu App Financeiro",
   "short_name": "Finance",
   "description": "App financeiro para controle de receitas e despesas",
-  "start_url": "/finance/index.html",
+  "start_url": "./index.html",
+  "scope": "/finance/",
   "display": "standalone",
-  "background_color": "#F9FAFB",
-  "theme_color": "#10B981",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "icons/icon-192.png",
