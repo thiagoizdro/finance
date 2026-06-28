@@ -1,11 +1,11 @@
 // service-worker.js
-const CACHE_NAME = 'finance-app-v2';
+const CACHE_NAME = 'finance-app-v3';
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/css/styles.css',
-    '/js/app.js?v=2',
-    '/manifest.json'
+    '/finance/',
+    '/finance/index.html',
+    '/finance/css/styles.css',
+    '/finance/js/app.js?v=2',
+    '/finance/manifest.json'
 ];
 
 // Instalar Service Worker
