@@ -1,41 +1,60 @@
-// service-worker.js
-const CACHE_NAME = 'finance-app-v3';
-const urlsToCache = [
-    '/finance/',
-    '/finance/index.html',
-    '/finance/css/styles.css',
-    '/finance/js/app.js?v=2',
-    '/finance/manifest.json'
+const CACHE_NAME = 'finance-app-v2';
+const ASSETS = [
+    './',
+    './index.html',
+    './css/styles.css',
+    './js/app.js',
+    './manifest.json',
+    './icons/icon-192.png',
+    './icons/icon-512.png'
 ];
 
-// Instalar Service Worker
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(urlsToCache))
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
     );
 });
 
-// Interceptar requisições
-self.addEventListener('fetch', event => {
-    event.respondWith(
-        caches.match(event.request)
-            .then(response => response || fetch(event.request))
-    );
-});
-
-// Atualizar cache
-self.addEventListener('activate', event => {
-    const cacheWhitelist = [CACHE_NAME];
+self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.keys().then(cacheNames => {
+        caches.keys().then((cacheNames) => {
             return Promise.all(
-                cacheNames.map(cacheName => {
-                    if (cacheWhitelist.indexOf(cacheName) === -1) {
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
                         return caches.delete(cacheName);
                     }
                 })
             );
+        }).then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET') return;
+
+    event.respondWith(
+        caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            return fetch(event.request).then((networkResponse) => {
+                if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+                    return networkResponse;
+                }
+
+                const responseToCache = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(event.request, responseToCache);
+                });
+
+                return networkResponse;
+            }).catch(() => {
+                if (event.request.mode === 'navigate') {
+                    return caches.match('./index.html');
+                }
+                return null;
+            });
         })
     );
 });

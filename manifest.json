@@ -1,12 +1,11 @@
 {
-  "name": "Seu App Financeiro",
-  "short_name": "Finance",
-  "description": "App financeiro para controle de receitas e despesas",
-  "start_url": "./index.html",
-  "scope": "/finance/",
+  "name": "Finance App",
+  "short_name": "FinanceApp",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#f4f7fb",
+  "theme_color": "#10B981",
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -20,3 +19,75 @@
     }
   ]
 }
+
+const CACHE_NAME = 'finance-app-v1';
+const ASSETS = [
+    './',
+    './index.html',
+    './styles.css',
+    './js/app.js',
+    './manifest.json',
+    './icons/icon-192.png',
+    './icons/icon-512.png'
+];
+
+// Instalação do SW
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => {
+                console.log('Cache aberto');
+                return cache.addAll(ASSETS);
+            })
+            .then(() => self.skipWaiting())
+    );
+});
+
+// Ativação do SW
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('Removendo cache antigo:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        }).then(() => self.clients.claim())
+    );
+});
+
+// Interceptação de requisições
+self.addEventListener('fetch', (event) => {
+    event.respondWith(
+        caches.match(event.request)
+            .then(response => {
+                // Cache hit - return response
+                if (response) {
+                    return response;
+                }
+                
+                // Clone da requisição
+                const fetchRequest = event.request.clone();
+                
+                return fetch(fetchRequest).then(response => {
+                    // Verificar se é uma resposta válida
+                    if (!response || response.status !== 200 || response.type !== 'basic') {
+                        return response;
+                    }
+                    
+                    // Clone da resposta
+                    const responseToCache = response.clone();
+                    
+                    caches.open(CACHE_NAME)
+                        .then(cache => {
+                            cache.put(event.request, responseToCache);
+                        });
+                    
+                    return response;
+                });
+            })
+    );
+});

@@ -23,15 +23,19 @@
     --bg-card: #111827;
     --text-primary: #F9FAFB;
     --text-secondary: #D1D5DB;
-    --card-border: rgba(255, 255, 255, 0.08);
+    --card-border: rgba(255, 255, 255, 0.12);
     --btn-bg: #22c55e;
     --btn-text: #F8FAFC;
     --btn-secondary-bg: #1f2937;
-    --btn-secondary-text: #d1d5db;
-    --input-bg: #111827;
-    --input-border: #374151;
+    --btn-secondary-text: #f3f4f6;
+    --input-bg: #0f172a;
+    --input-border: #475569;
     --toast-bg: #F8FAFC;
     --toast-text: #111827;
+    --surface-elevated: #1f2937;
+    --surface-muted: #0f172a;
+    --surface-border: #334155;
+    --text-muted: #94a3b8;
 }
 
 * {
@@ -114,7 +118,7 @@ body {
 }
 
 .header p {
-    color: #6B7280;
+    color: var(--text-secondary);
     font-size: 16px;
 }
 
@@ -161,7 +165,7 @@ body {
 
 .chart-card-header p {
     margin: 0;
-    color: #6B7280;
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
@@ -201,7 +205,7 @@ body {
     display: block;
     font-weight: 600;
     margin-bottom: 8px;
-    color: #374151;
+    color: var(--text-primary);
     font-size: 14px;
 }
 
@@ -246,7 +250,8 @@ body {
 }
 
 .btn-group button:hover {
-    background: #E5E7EB;
+    background: var(--surface-elevated);
+    color: var(--text-primary);
     transform: scale(1.02);
 }
 
@@ -364,7 +369,7 @@ body {
 }
 
 .dashboard-header p {
-    color: #6B7280;
+    color: var(--text-secondary);
     font-size: 14px;
     margin-top: 4px;
 }
@@ -478,19 +483,19 @@ body {
 .card-value {
     font-size: 16px;
     font-weight: 800;
-    color: #111827;
+    color: var(--text-primary);
 }
 
 /* ============================================
    DAY BUTTONS
    ============================================ */
 .day-buttons {
-    background: #FFFFFF;
+    background: var(--bg-card);
     padding: 16px;
     border-radius: 12px;
     margin-bottom: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    border: 1px solid #F3F4F6;
+    border: 1px solid var(--card-border);
 }
 
 .day-info {
@@ -582,22 +587,22 @@ body {
 
 .empty-state {
     text-align: center;
-    color: #6b7280;
+    color: var(--text-secondary);
     padding: 32px 16px;
-    border: 2px dashed #d1d5db;
+    border: 2px dashed var(--surface-border);
     border-radius: 14px;
-    background: #f9fafb;
+    background: var(--surface-muted);
 }
 
 .empty-state strong {
-    color: #374151;
+    color: var(--text-primary);
 }
 
 /* ============================================
    TRANSACTION ITEMS (com hover melhorado)
    ============================================ */
 .transaction-item {
-    background: #FFFFFF;
+    background: var(--bg-card);
     padding: 16px;
     border-radius: 12px;
     margin-bottom: 10px;
@@ -605,14 +610,14 @@ body {
     align-items: center;
     gap: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    border: 1px solid #F3F4F6;
+    border: 1px solid var(--card-border);
     transition: all 0.3s ease;
 }
 
 /* HOVER Premium */
 .transaction-item:hover {
-    background: #F8FAFC;
-    border-color: #E2E8F0;
+    background: var(--surface-elevated);
+    border-color: var(--surface-border);
     transform: translateX(4px);
     box-shadow: 0 4px 15px rgba(0,0,0,0.06);
 }
@@ -625,18 +630,18 @@ body {
 .transaction-desc {
     font-weight: 700;
     font-size: 14px;
-    color: #111827;
+    color: var(--text-primary);
 }
 
 .transaction-person {
     font-size: 12px;
-    color: #6B7280;
+    color: var(--text-secondary);
     margin-top: 2px;
 }
 
 .transaction-date {
     font-size: 11px;
-    color: #9CA3AF;
+    color: var(--text-muted);
     margin-top: 2px;
 }
 
@@ -657,19 +662,20 @@ body {
    ACTION BUTTONS
    ============================================ */
 .action-btn {
-    background: #F9FAFB;
-    border: 1px solid #E5E7EB;
+    background: var(--surface-muted);
+    border: 1px solid var(--surface-border);
     padding: 6px 10px;
     border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s ease;
+    color: var(--text-primary);
 }
 
 .action-btn:hover {
-    background: #E5E7EB;
+    background: var(--surface-elevated);
     transform: scale(1.1);
-    border-color: #D1D5DB;
+    border-color: var(--surface-border);
 }
 
 .action-btn:active {
@@ -681,10 +687,10 @@ body {
    ============================================ */
 .filter-btn {
     padding: 8px 16px;
-    border: 2px solid #E5E7EB;
+    border: 2px solid var(--surface-border);
     border-radius: 20px;
-    background: #FFF;
-    color: #6B7280;
+    background: var(--bg-card);
+    color: var(--text-secondary);
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
@@ -692,7 +698,8 @@ body {
 }
 
 .filter-btn:hover {
-    background: #F3F4F6;
+    background: var(--surface-elevated);
+    color: var(--text-primary);
     transform: scale(1.02);
 }
 
@@ -758,7 +765,7 @@ body {
 }
 
 .modal-content {
-    background: #FFF;
+    background: var(--bg-card);
     border-radius: 24px 24px 0 0;
     padding: 24px;
     max-width: 600px;
@@ -766,6 +773,7 @@ body {
     max-height: 90vh;
     overflow-y: auto;
     animation: slideUp 0.35s ease;
+    border: 1px solid var(--card-border);
 }
 
 .modal-header {
@@ -784,14 +792,14 @@ body {
     background: none;
     border: none;
     font-size: 28px;
-    color: #6B7280;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
     padding: 0 8px;
 }
 
 .btn-close:hover {
-    color: #111827;
+    color: var(--text-primary);
     transform: rotate(90deg);
 }
 

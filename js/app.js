@@ -207,7 +207,7 @@ class ChartManager {
 
     createBalanceChart(data) {
         const ctx = document.getElementById('balance-chart');
-        if (!ctx) return;
+        if (!ctx || typeof Chart === 'undefined') return;
 
         const labels = Object.keys(data);
         const discounts = labels.map(month => data[month].discounts);
@@ -253,7 +253,7 @@ class ChartManager {
 
     createPieChart(data) {
         const ctx = document.getElementById('pie-chart');
-        if (!ctx) return;
+        if (!ctx || typeof Chart === 'undefined') return;
 
         const labels = data.map(item => item[0]);
         const values = data.map(item => item[1].total);
