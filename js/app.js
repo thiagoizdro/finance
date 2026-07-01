@@ -1,7 +1,7 @@
-// js/app.js - Versão Completa e Autossuficiente
+// js/app.js - Versão Completa com Filtro e Exportação CSV
 
 // ============================================
-// PARTE 1: STORAGE (DEFINIDO PRIMEIRO)
+// PARTE 1: STORAGE
 // ============================================
 
 class Storage {
@@ -72,9 +72,390 @@ class Storage {
     }
 }
 
-const storage = window.storage || new Storage();
-window.storage = storage;
-window.Storage = storage;
+const storage = new Storage();
+
+const themeSettings = {
+    key: 'finance_theme',
+    default: 'light'
+};
+
+function setTheme(theme) {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    localStorage.setItem(themeSettings.key, theme);
+
+    const button = document.getElementById('theme-toggle');
+    if (button) {
+        button.textContent = theme === 'dark' ? '☀️' : '🌙';
+        button.title = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
+    }
+}
+
+function loadTheme() {
+    const saved = localStorage.getItem(themeSettings.key) || themeSettings.default;
+    setTheme(saved);
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || themeSettings.default;
+    const next = current === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+}
+
+class Analytics {
+    constructor(transactions, config) {
+        this.transactions = transactions || [];
+        this.config = config || { regime: 'daily', rate: 0, daysWorked: 0 };
+    }
+
+    parseDate(dateString) {
+        const [day, month, year] = dateString.split('/');
+        return new Date(`${year}-${month}-${day}`);
+    }
+
+    getMonthKey(dateString) {
+        const [day, month, year] = dateString.split('/');
+        return `${year}-${month.padStart(2, '0')}`;
+    }
+
+    getSpendingTrend() {
+        const monthlyData = {};
+        const monthKeys = new Set();
+        const currentMonth = this.getMonthKey(new Date().toLocaleDateString('pt-BR'));
+        monthKeys.add(currentMonth);
+
+        [...this.transactions]
+            .filter(t => t.type === 'personal_discount')
+            .sort((a, b) => this.parseDate(a.date) - this.parseDate(b.date))
+            .forEach(t => {
+                const month = this.getMonthKey(t.date);
+                monthKeys.add(month);
+                if (!monthlyData[month]) {
+                    monthlyData[month] = { discounts: 0, gross: 0 };
+                }
+                monthlyData[month].discounts += t.amount;
+            });
+
+        const grossValue = this.config.regime === 'monthly'
+            ? this.config.rate
+            : this.config.rate * (this.config.daysWorked || 0);
+
+        Array.from(monthKeys)
+            .sort()
+            .forEach(month => {
+                if (!monthlyData[month]) {
+                    monthlyData[month] = { discounts: 0, gross: 0 };
+                }
+                monthlyData[month].gross = grossValue;
+            });
+
+        return monthlyData;
+    }
+
+    getTopCategories(limit = 5) {
+        const categories = {};
+
+        this.transactions
+            .filter(t => t.type === 'personal_discount')
+            .forEach(t => {
+                const category = t.description ? t.description.trim() : 'Outros';
+                const key = category || 'Outros';
+
+                if (!categories[key]) {
+                    categories[key] = { count: 0, total: 0 };
+                }
+                categories[key].count += 1;
+                categories[key].total += t.amount;
+            });
+
+        return Object.entries(categories)
+            .sort((a, b) => b[1].total - a[1].total)
+            .slice(0, limit);
+    }
+
+    calculateCurrentBalance() {
+        const gross = this.config.regime === 'monthly'
+            ? this.config.rate
+            : this.config.rate * (this.config.daysWorked || 0);
+
+        const discounts = this.transactions
+            .filter(t => t.type === 'personal_discount')
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        const received = this.transactions
+            .filter(t => t.type === 'third_party' && t.status === 'received')
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        return gross - discounts + received;
+    }
+
+    getDailyAverage() {
+        const discounts = this.transactions
+            .filter(t => t.type === 'personal_discount')
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        const days = this.config.daysWorked || 1;
+        return discounts / days;
+    }
+}
+
+class ChartManager {
+    constructor() {
+        this.balanceChart = null;
+        this.pieChart = null;
+    }
+
+    createBalanceChart(data) {
+        const ctx = document.getElementById('balance-chart');
+        if (!ctx) return;
+
+        const labels = Object.keys(data);
+        const discounts = labels.map(month => data[month].discounts);
+        const gross = labels.map(month => data[month].gross);
+
+        this.balanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Total Bruto',
+                        data: gross,
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 4,
+                    },
+                    {
+                        label: 'Descontos Totais',
+                        data: discounts,
+                        borderColor: '#EF4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 4,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    createPieChart(data) {
+        const ctx = document.getElementById('pie-chart');
+        if (!ctx) return;
+
+        const labels = data.map(item => item[0]);
+        const values = data.map(item => item[1].total);
+
+        this.pieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    updateCharts(transactions, config) {
+        const analytics = new Analytics(transactions, config);
+        const trend = analytics.getSpendingTrend();
+        const categories = analytics.getTopCategories();
+
+        if (this.balanceChart) {
+            this.balanceChart.destroy();
+            this.balanceChart = null;
+        }
+
+        if (this.pieChart) {
+            this.pieChart.destroy();
+            this.pieChart = null;
+        }
+
+        this.createBalanceChart(trend);
+        this.createPieChart(categories);
+    }
+}
+
+const chartManager = new ChartManager();
+
+class NotificationSystem {
+    constructor() {
+        this.permission = 'default';
+        this.init();
+    }
+
+    init() {
+        if ('Notification' in window) {
+            this.permission = Notification.permission;
+        }
+    }
+
+    async requestPermission() {
+        if ('Notification' in window && this.permission === 'default') {
+            this.permission = await Notification.requestPermission();
+        }
+        return this.permission === 'granted';
+    }
+
+    send({ title, body, icon = '📱' }) {
+        if (!('Notification' in window)) {
+            console.log(`🔔 ${title}: ${body}`);
+            return;
+        }
+
+        if (this.permission === 'granted') {
+            new Notification(title, {
+                body,
+                icon,
+                tag: Date.now().toString(),
+                requireInteraction: true
+            });
+        } else {
+            console.log(`🔔 ${title}: ${body}`);
+        }
+    }
+
+    getTodayTransactions(transactions) {
+        const today = new Date().toLocaleDateString('pt-BR');
+        return transactions.filter(t => t.date === today);
+    }
+
+    isOverdue(date) {
+        const [day, month, year] = date.split('/');
+        const transactionDate = new Date(`${year}-${month}-${day}`);
+        const now = new Date();
+        const diffDays = Math.floor((now - transactionDate) / (1000 * 60 * 60 * 24));
+        return diffDays > 7;
+    }
+
+    notifyLowBalance(balance, threshold = 100) {
+        if (balance < threshold) {
+            this.send({
+                title: '⚠️ Saldo Baixo',
+                body: `Seu saldo atual é R$ ${balance.toFixed(2)}. Considere reduzir gastos.`,
+                icon: '🔴'
+            });
+        }
+    }
+
+    notifyDueThirdParty(transactions) {
+        const due = transactions.filter(t =>
+            t.type === 'third_party' &&
+            t.status === 'pending' &&
+            this.isOverdue(t.date)
+        );
+
+        if (due.length > 0) {
+            this.send({
+                title: '💰 Pagamentos Pendentes',
+                body: `Você tem ${due.length} pagamentos atrasados.`,
+                icon: '📢'
+            });
+        }
+    }
+
+    notifyDailyReport(balance, transactions) {
+        const today = this.getTodayTransactions(transactions);
+        if (today.length > 0) {
+            const total = today.reduce((sum, t) => sum + t.amount, 0);
+            this.send({
+                title: `📊 Movimentações de Hoje (${today.length})`,
+                body: `Total: R$ ${total.toFixed(2)} | Saldo: R$ ${balance.toFixed(2)}`,
+                icon: '📊'
+            });
+        }
+    }
+}
+
+class DataSync {
+    constructor(storage) {
+        this.storage = storage;
+        this.backupInterval = null;
+    }
+
+    enableAutoBackup(intervalMinutes = 60) {
+        this.createBackup();
+        this.backupInterval = setInterval(() => {
+            this.createBackup();
+        }, intervalMinutes * 60 * 1000);
+    }
+
+    disableAutoBackup() {
+        if (this.backupInterval) {
+            clearInterval(this.backupInterval);
+            this.backupInterval = null;
+        }
+    }
+
+    createBackup() {
+        const data = this.storage.getData();
+        if (!data) return;
+
+        const backup = {
+            ...data,
+            backupDate: new Date().toISOString(),
+            version: '1.0'
+        };
+
+        try {
+            localStorage.setItem('finance_backup', JSON.stringify(backup));
+            console.log('💾 Backup automático realizado');
+        } catch (e) {
+            console.error('❌ Erro no backup:', e);
+        }
+    }
+
+    restoreBackup() {
+        try {
+            const backup = localStorage.getItem('finance_backup');
+            if (!backup) {
+                return { success: false, message: 'Nenhum backup encontrado' };
+            }
+
+            const data = JSON.parse(backup);
+            if (!data.config || !data.transactions) {
+                return { success: false, message: 'Backup inválido' };
+            }
+
+            this.storage.saveData({
+                config: data.config,
+                transactions: data.transactions
+            });
+
+            return { success: true, message: 'Backup restaurado com sucesso' };
+        } catch (e) {
+            return { success: false, message: e.message };
+        }
+    }
+
+    syncToCloud() {
+        console.log('☁️ Sincronizando com a nuvem...');
+    }
+}
+
+const notificationSystem = new NotificationSystem();
+const dataSync = new DataSync(storage);
 
 // ============================================
 // PARTE 2: STATE
@@ -83,6 +464,8 @@ window.Storage = storage;
 const state = {
     config: null,
     transactions: [],
+    filterType: 'all', // Filtro: 'all', 'personal_discount', 'third_party'
+    searchQuery: '',
     modalType: 'personal_discount',
     modalStatus: 'pending',
     editingId: null
@@ -92,24 +475,25 @@ const state = {
 // PARTE 3: FUNÇÕES DO APP
 // ============================================
 
-// Inicialização
 function init() {
     console.log('🚀 Iniciando app...');
-    
-    // Verificar se o Storage está disponível
-    if (typeof storage === 'undefined') {
-        console.error('❌ storage não definido!');
-        alert('Erro ao carregar o app. Recarregue a página.');
-        return;
-    }
-    
     loadData();
     setupEventListeners();
-    updateUI();
+
+    loadTheme();
+    dataSync.enableAutoBackup(60);
+    notificationSystem.requestPermission();
+
+    if (state.config) {
+        showDashboard();
+    } else {
+        showConfig();
+        updateUI();
+    }
+
     console.log('✅ App iniciado!');
 }
 
-// Carregar dados
 function loadData() {
     try {
         state.config = storage.getConfig();
@@ -123,80 +507,114 @@ function loadData() {
     }
 }
 
-// Configurar eventos
 function setupEventListeners() {
     console.log('🔧 Configurando eventos...');
 
     // ===== Tela de Configuração =====
-    // Botões de regime
     document.querySelectorAll('.btn-regime').forEach(btn => {
         btn.addEventListener('click', toggleRegime);
     });
 
-    // Botão salvar configuração
     const saveConfigBtn = document.getElementById('save-config');
     if (saveConfigBtn) {
         saveConfigBtn.addEventListener('click', saveConfig);
-        console.log('✅ Botão Salvar Configuração vinculado');
-    } else {
-        console.warn('⚠️ Botão Salvar Configuração não encontrado');
     }
 
     // ===== Dashboard =====
-    // Botão reset
     const resetBtn = document.getElementById('reset-btn');
     if (resetBtn) {
         resetBtn.addEventListener('click', resetApp);
-        console.log('✅ Botão Reset vinculado');
     }
 
-    // Botão adicionar dia
     const addDayBtn = document.getElementById('add-day');
     if (addDayBtn) {
         addDayBtn.addEventListener('click', addDay);
-        console.log('✅ Botão Adicionar Dia vinculado');
     }
 
-    // Botão remover dia
     const removeDayBtn = document.getElementById('remove-day');
     if (removeDayBtn) {
         removeDayBtn.addEventListener('click', removeDay);
-        console.log('✅ Botão Remover Dia vinculado');
     }
 
-    // Botão nova transação
     const newTransactionBtn = document.getElementById('new-transaction');
     if (newTransactionBtn) {
         newTransactionBtn.addEventListener('click', () => openModal());
-        console.log('✅ Botão Nova Movimentação vinculado');
+    }
+
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', toggleTheme);
+    }
+
+    const notificationBtn = document.getElementById('notifications-btn');
+    if (notificationBtn) {
+        notificationBtn.addEventListener('click', async () => {
+            const granted = await notificationSystem.requestPermission();
+            showToast(granted ? 'Notificações ativadas.' : 'Permissão de notificações não concedida.', granted ? 'success' : 'error');
+        });
+    }
+
+    const restoreBackupBtn = document.getElementById('restore-backup-btn');
+    if (restoreBackupBtn) {
+        restoreBackupBtn.addEventListener('click', () => {
+            const result = dataSync.restoreBackup();
+            if (result.success) {
+                state.config = storage.getConfig();
+                state.transactions = storage.getTransactions();
+                updateUI();
+                showToast(result.message);
+            } else {
+                showToast(result.message, 'error');
+            }
+        });
+    }
+
+    // ===== Busca =====
+    const searchInput = document.getElementById('transaction-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            state.searchQuery = e.target.value.trim().toLowerCase();
+            renderTransactions();
+            updateSummaryBanner();
+        });
+    }
+
+    // ===== Filtros =====
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            state.filterType = e.target.dataset.filter;
+            renderTransactions();
+            updateSummaryBanner();
+        });
+    });
+
+    // ===== Botão Exportar CSV =====
+    const exportBtn = document.getElementById('export-csv');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportToCSV);
     }
 
     // ===== Modal =====
-    // Botão fechar modal
     const closeModalBtn = document.getElementById('close-modal');
     if (closeModalBtn) {
         closeModalBtn.addEventListener('click', closeModal);
-        console.log('✅ Botão Fechar Modal vinculado');
     }
 
-    // Botões de tipo
     document.querySelectorAll('.btn-type').forEach(btn => {
         btn.addEventListener('click', toggleType);
     });
 
-    // Botões de status
     document.querySelectorAll('.btn-status').forEach(btn => {
         btn.addEventListener('click', toggleStatus);
     });
 
-    // Botão salvar transação
     const saveTransactionBtn = document.getElementById('save-transaction');
     if (saveTransactionBtn) {
         saveTransactionBtn.addEventListener('click', saveTransaction);
-        console.log('✅ Botão Salvar Transação vinculado');
     }
 
-    // Fechar modal ao clicar fora
     const modal = document.getElementById('modal');
     if (modal) {
         modal.addEventListener('click', (e) => {
@@ -229,8 +647,6 @@ function setupEventListeners() {
             rateLabel.textContent = regime === 'daily' ? 'Valor por Dia (R$)' : 'Salário Mensal (R$)';
         }
     }
-
-    console.log('✅ Todos os eventos configurados!');
 }
 
 // ============================================
@@ -238,7 +654,6 @@ function setupEventListeners() {
 // ============================================
 
 function toggleRegime(e) {
-    console.log('🔄 Toggle Regime:', e.target.dataset.regime);
     document.querySelectorAll('.btn-regime').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
     
@@ -254,12 +669,22 @@ function toggleRegime(e) {
     }
 }
 
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+
+    toast.textContent = message;
+    toast.className = `toast show ${type}`;
+    clearTimeout(showToast.timeout);
+    showToast.timeout = setTimeout(() => {
+        toast.className = 'toast';
+    }, 2400);
+}
+
 function saveConfig() {
-    console.log('💾 Salvando configuração...');
-    
     const activeRegime = document.querySelector('.btn-regime.active');
     if (!activeRegime) {
-        alert('Por favor, selecione um regime.');
+        showToast('Selecione um regime.', 'error');
         return;
     }
 
@@ -270,15 +695,13 @@ function saveConfig() {
     const rate = parseFloat(rateInput ? rateInput.value : '0');
     const days = parseInt(daysInput ? daysInput.value : '0') || 0;
 
-    console.log('📊 Dados:', { regime, rate, days });
-
     if (!rate || rate <= 0) {
-        alert('Por favor, insira um valor válido.');
+        showToast('Insira um valor válido.', 'error');
         return;
     }
 
     if (regime === 'daily' && days <= 0) {
-        alert('Por favor, insira a quantidade de dias trabalhados.');
+        showToast('Informe os dias trabalhados.', 'error');
         return;
     }
 
@@ -290,7 +713,8 @@ function saveConfig() {
 
     storage.saveConfig(config);
     state.config = config;
-    alert('✅ Configurações salvas!');
+    dataSync.createBackup();
+    showToast('Configurações salvas com sucesso!');
     showDashboard();
 }
 
@@ -299,7 +723,6 @@ function saveConfig() {
 // ============================================
 
 function showDashboard() {
-    console.log('📱 Mostrando Dashboard...');
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const dashboard = document.getElementById('dashboard-screen');
     if (dashboard) dashboard.classList.add('active');
@@ -307,7 +730,6 @@ function showDashboard() {
 }
 
 function showConfig() {
-    console.log('⚙️ Mostrando Configuração...');
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const configScreen = document.getElementById('config-screen');
     if (configScreen) configScreen.classList.add('active');
@@ -318,8 +740,6 @@ function showConfig() {
 // ============================================
 
 function updateUI() {
-    console.log('🔄 Atualizando UI...');
-    
     if (!state.config) {
         showConfig();
         return;
@@ -347,6 +767,8 @@ function updateUI() {
     // Calcular totais
     const totals = calculateTotals();
 
+    updateSummaryBanner();
+
     // Atualizar cards
     const cardMap = {
         'total-gross': totals.gross,
@@ -366,6 +788,13 @@ function updateUI() {
 
     // Renderizar transações
     renderTransactions();
+
+    if (window.Chart && state.config) {
+        chartManager.updateCharts(state.transactions, state.config);
+    }
+
+    notificationSystem.notifyLowBalance(totals.netBalance, 100);
+    notificationSystem.notifyDueThirdParty(state.transactions);
 }
 
 // ============================================
@@ -403,21 +832,46 @@ function calculateTotals() {
 }
 
 // ============================================
-// TRANSAÇÕES
+// TRANSAÇÕES COM FILTRO
 // ============================================
 
 function renderTransactions() {
     const list = document.getElementById('transactions-list');
     if (!list) return;
 
-    const transactions = state.transactions;
+    // Aplicar filtro
+    let filtered = state.transactions;
+    if (state.filterType !== 'all') {
+        filtered = state.transactions.filter(t => t.type === state.filterType);
+    }
 
-    if (transactions.length === 0) {
-        list.innerHTML = '<p style="color: #9CA3AF; text-align: center; padding: 20px;">Nenhum lançamento registrado</p>';
+    // Aplicar busca por descrição ou nome
+    if (state.searchQuery) {
+        filtered = filtered.filter(t => {
+            const description = t.description ? t.description.toLowerCase() : '';
+            const personName = t.personName ? t.personName.toLowerCase() : '';
+            return description.includes(state.searchQuery) || personName.includes(state.searchQuery);
+        });
+    }
+
+    if (filtered.length === 0) {
+        const message = state.transactions.length === 0
+            ? 'Adicione uma movimentação para acompanhar seus valores.'
+            : state.searchQuery
+                ? 'Nenhuma transação corresponde à busca atual.'
+                : 'Tente ajustar o filtro aplicado.';
+
+        list.innerHTML = `
+            <div class="empty-state">
+                <div style="font-size: 28px; margin-bottom: 8px;">🧾</div>
+                <strong>Nenhum lançamento encontrado</strong>
+                <p style="margin-top: 6px;">${message}</p>
+            </div>
+        `;
         return;
     }
 
-    const sorted = [...transactions].reverse();
+    const sorted = [...filtered].reverse();
 
     list.innerHTML = sorted.map(t => `
         <div class="transaction-item">
@@ -428,7 +882,9 @@ function renderTransactions() {
                 ${t.personName ? `<div class="transaction-person">${t.personName} · ${t.status === 'pending' ? '⏳ Pendente' : '✅ Recebido'}</div>` : ''}
                 <div class="transaction-date">${t.date}</div>
             </div>
-            <div class="transaction-amount">-${formatBRL(t.amount)}</div>
+            <div class="transaction-amount" style="color: ${t.type === 'personal_discount' ? '#EF4444' : '#10B981'}">
+                ${t.type === 'personal_discount' ? '-' : '+'} ${formatBRL(t.amount)}
+            </div>
             <div class="transaction-actions">
                 ${t.type === 'third_party' ? `
                     <button onclick="window.toggleStatus('${t.id}')" title="Alterar status" class="action-btn">
@@ -442,12 +898,94 @@ function renderTransactions() {
     `).join('');
 }
 
+function updateSummaryBanner() {
+    const banner = document.getElementById('summary-banner');
+    if (!banner) return;
+
+    if (!state.config) {
+        banner.innerHTML = '<div class="summary-title">Resumo</div><div class="summary-values"><span>Configure seu app</span><span>para começar</span></div>';
+        return;
+    }
+
+    const totals = calculateTotals();
+    
+    // Aplicar filtro para o resumo
+    let filteredCount = state.transactions.length;
+    if (state.filterType !== 'all' || state.searchQuery) {
+        filteredCount = state.transactions.filter(t => {
+            const typeMatches = state.filterType === 'all' || t.type === state.filterType;
+            const description = t.description ? t.description.toLowerCase() : '';
+            const personName = t.personName ? t.personName.toLowerCase() : '';
+            const searchMatches = !state.searchQuery || description.includes(state.searchQuery) || personName.includes(state.searchQuery);
+            return typeMatches && searchMatches;
+        }).length;
+    }
+
+    banner.innerHTML = `
+        <div class="summary-title">Resumo rápido</div>
+        <div class="summary-values">
+            <span>A receber: <strong>${formatBRL(totals.toReceive)}</strong></span>
+            <span>Saldo: <strong>${formatBRL(totals.netBalance)}</strong></span>
+            <span style="font-size: 0.7rem; opacity: 0.6;">${filteredCount} itens visíveis</span>
+        </div>
+    `;
+}
+
+// ============================================
+// EXPORTAR CSV
+// ============================================
+
+function exportToCSV() {
+    // Usar dados filtrados para exportação
+    let dataToExport = state.transactions;
+    if (state.filterType !== 'all') {
+        dataToExport = state.transactions.filter(t => t.type === state.filterType);
+    }
+
+    if (dataToExport.length === 0) {
+        showToast('Nenhum dado para exportar com o filtro atual.', 'error');
+        return;
+    }
+
+    const headers = ['Data', 'Tipo', 'Descrição', 'Valor (R$)', 'Pessoa', 'Status'];
+    
+    const rows = dataToExport.map(t => {
+        const typeLabel = t.type === 'personal_discount' ? 'Desconto Pessoal' : 'Terceiros';
+        const statusLabel = t.status === 'pending' ? 'Pendente' : t.status === 'received' ? 'Recebido' : 'N/A';
+        return [
+            t.date,
+            typeLabel,
+            t.description,
+            t.amount.toFixed(2),
+            t.personName || '',
+            statusLabel
+        ];
+    });
+    
+    let csvContent = [headers, ...rows]
+        .map(row => row.join(','))
+        .join('\n');
+
+    // Adicionar BOM para UTF-8
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `relatorio_financeiro_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showToast('CSV exportado com sucesso!');
+}
+
 // ============================================
 // DIAS TRABALHADOS
 // ============================================
 
 function addDay() {
-    console.log('➕ Adicionando dia...');
     if (!state.config) {
         alert('Configure o app primeiro!');
         return;
@@ -455,24 +993,21 @@ function addDay() {
     state.config.daysWorked += 1;
     storage.saveConfig(state.config);
     updateUI();
-    console.log('✅ Dia adicionado:', state.config.daysWorked);
 }
 
 function removeDay() {
-    console.log('➖ Removendo dia...');
     if (!state.config) {
         alert('Configure o app primeiro!');
         return;
     }
     if (state.config.daysWorked <= 0) {
-        alert('Não há dias para remover.');
+        showToast('Não há dias para remover.', 'error');
         return;
     }
     if (confirm(`Deseja remover 1 dia trabalhado?\n\nVocê tem ${state.config.daysWorked} dia(s) registrado(s).`)) {
         state.config.daysWorked -= 1;
         storage.saveConfig(state.config);
         updateUI();
-        console.log('✅ Dia removido:', state.config.daysWorked);
     }
 }
 
@@ -481,7 +1016,6 @@ function removeDay() {
 // ============================================
 
 function openModal(transactionId = null) {
-    console.log('📝 Abrindo modal...', transactionId);
     const modal = document.getElementById('modal');
     const title = document.getElementById('modal-title');
     
@@ -548,18 +1082,15 @@ function openModal(transactionId = null) {
     }
     
     modal.classList.add('active');
-    console.log('✅ Modal aberto');
 }
 
 function closeModal() {
-    console.log('❌ Fechando modal...');
     const modal = document.getElementById('modal');
     if (modal) modal.classList.remove('active');
     state.editingId = null;
 }
 
 function toggleType(e) {
-    console.log('🔄 Toggle Type:', e.target.dataset.type);
     document.querySelectorAll('.btn-type').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
     
@@ -573,15 +1104,12 @@ function toggleType(e) {
 }
 
 function toggleStatus(e) {
-    console.log('🔄 Toggle Status:', e.target.dataset.status);
     document.querySelectorAll('.btn-status').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
     state.modalStatus = e.target.dataset.status;
 }
 
 function saveTransaction() {
-    console.log('💾 Salvando transação...');
-    
     const descInput = document.getElementById('modal-description');
     const amountInput = document.getElementById('modal-amount');
     const personInput = document.getElementById('modal-person');
@@ -593,17 +1121,17 @@ function saveTransaction() {
     const status = state.modalStatus;
 
     if (!description) {
-        alert('Por favor, insira uma descrição.');
+        showToast('Informe uma descrição.', 'error');
         return;
     }
 
     if (!amount || amount <= 0) {
-        alert('Por favor, insira um valor válido.');
+        showToast('Informe um valor válido.', 'error');
         return;
     }
 
     if (type === 'third_party' && !personName) {
-        alert('Por favor, insira o nome da pessoa.');
+        showToast('Informe o nome da pessoa.', 'error');
         return;
     }
 
@@ -616,19 +1144,18 @@ function saveTransaction() {
         ...(type === 'third_party' && { personName, status })
     };
 
-    console.log('📊 Transação:', transaction);
-
     if (state.editingId) {
         storage.updateTransaction(state.editingId, transaction);
-        console.log('✅ Transação atualizada');
     } else {
         storage.saveTransaction(transaction);
-        console.log('✅ Transação salva');
     }
 
     state.transactions = storage.getTransactions();
+    dataSync.createBackup();
+    notificationSystem.notifyDailyReport(calculateTotals().netBalance, state.transactions);
     closeModal();
     updateUI();
+    showToast('Movimentação salva com sucesso!');
 }
 
 // ============================================
@@ -636,7 +1163,6 @@ function saveTransaction() {
 // ============================================
 
 window.toggleStatus = function(id) {
-    console.log('🔄 Toggling status:', id);
     const transaction = state.transactions.find(t => t.id === id);
     if (!transaction) return;
     
@@ -647,12 +1173,10 @@ window.toggleStatus = function(id) {
 };
 
 window.editTransaction = function(id) {
-    console.log('✏️ Editando:', id);
     openModal(id);
 };
 
 window.deleteTransaction = function(id) {
-    console.log('🗑️ Deletando:', id);
     const transaction = state.transactions.find(t => t.id === id);
     if (!transaction) return;
     
@@ -668,13 +1192,12 @@ window.deleteTransaction = function(id) {
 // ============================================
 
 function resetApp() {
-    console.log('🔄 Resetando app...');
     if (confirm('Tem certeza que deseja apagar todos os dados e recomeçar?\n\nEsta ação não pode ser desfeita!')) {
         storage.resetApp();
         state.config = null;
         state.transactions = [];
         showConfig();
-        console.log('✅ App resetado');
+        showToast('App reiniciado com sucesso.');
     }
 }
 
@@ -690,20 +1213,10 @@ function formatBRL(value) {
 // INICIAR APP
 // ============================================
 
-// Garantir que o DOM está carregado
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
-    // DOM já carregado
     init();
 }
 
 console.log('📱 App carregado!');
-
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/finance/service-worker.js')
-            .then(reg => console.log('SW registrado!', reg))
-            .catch(err => console.error('Erro no registro:', err));
-    });
-}
