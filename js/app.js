@@ -105,7 +105,7 @@ function toggleTheme() {
 class Analytics {
     constructor(transactions, config) {
         this.transactions = transactions || [];
-        this.config = config || { regime: 'daily', rate: 0, daysWorked: 0 };
+        this.config = config || { rate: 0, daysWorked: 0 };
     }
 
     parseDate(dateString) {
@@ -136,9 +136,7 @@ class Analytics {
                 monthlyData[month].discounts += t.amount;
             });
 
-        const grossValue = this.config.regime === 'monthly'
-            ? this.config.rate
-            : this.config.rate * (this.config.daysWorked || 0);
+        const grossValue = this.config.rate * (this.config.daysWorked || 0);
 
         Array.from(monthKeys)
             .sort()
@@ -174,9 +172,7 @@ class Analytics {
     }
 
     calculateCurrentBalance() {
-        const gross = this.config.regime === 'monthly'
-            ? this.config.rate
-            : this.config.rate * (this.config.daysWorked || 0);
+        const gross = this.config.rate * (this.config.daysWorked || 0);
 
         const discounts = this.transactions
             .filter(t => t.type === 'personal_discount')
@@ -199,105 +195,6 @@ class Analytics {
     }
 }
 
-class ChartManager {
-    constructor() {
-        this.balanceChart = null;
-        this.pieChart = null;
-    }
-
-    createBalanceChart(data) {
-        const ctx = document.getElementById('balance-chart');
-        if (!ctx || typeof Chart === 'undefined') return;
-
-        const labels = Object.keys(data);
-        const discounts = labels.map(month => data[month].discounts);
-        const gross = labels.map(month => data[month].gross);
-
-        this.balanceChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: 'Total Bruto',
-                        data: gross,
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.12)',
-                        fill: true,
-                        tension: 0.35,
-                        pointRadius: 4,
-                    },
-                    {
-                        label: 'Descontos Totais',
-                        data: discounts,
-                        borderColor: '#EF4444',
-                        backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                        fill: true,
-                        tension: 0.35,
-                        pointRadius: 4,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
-                },
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-    }
-
-    createPieChart(data) {
-        const ctx = document.getElementById('pie-chart');
-        if (!ctx || typeof Chart === 'undefined') return;
-
-        const labels = data.map(item => item[0]);
-        const values = data.map(item => item[1].total);
-
-        this.pieChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981']
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
-            }
-        });
-    }
-
-    updateCharts(transactions, config) {
-        const analytics = new Analytics(transactions, config);
-        const trend = analytics.getSpendingTrend();
-        const categories = analytics.getTopCategories();
-
-        if (this.balanceChart) {
-            this.balanceChart.destroy();
-            this.balanceChart = null;
-        }
-
-        if (this.pieChart) {
-            this.pieChart.destroy();
-            this.pieChart = null;
-        }
-
-        this.createBalanceChart(trend);
-        this.createPieChart(categories);
-    }
-}
-
-const chartManager = new ChartManager();
 
 class NotificationSystem {
     constructor() {
@@ -720,10 +617,6 @@ function setupEventListeners() {
     console.log('🔧 Configurando eventos...');
 
     // ===== Tela de Configuração =====
-    document.querySelectorAll('.btn-regime').forEach(btn => {
-        btn.addEventListener('click', toggleRegime);
-    });
-
     const saveConfigBtn = document.getElementById('save-config');
     if (saveConfigBtn) {
         saveConfigBtn.addEventListener('click', saveConfig);
@@ -843,50 +736,14 @@ function setupEventListeners() {
 
     // ===== Preencher configuração inicial =====
     if (state.config) {
-        const regime = state.config.regime || 'daily';
-        const regimeBtn = document.querySelector(`.btn-regime[data-regime="${regime}"]`);
-        if (regimeBtn) {
-            document.querySelectorAll('.btn-regime').forEach(b => b.classList.remove('active'));
-            regimeBtn.classList.add('active');
-        }
-        
         const rateInput = document.getElementById('rate-input');
         if (rateInput) rateInput.value = state.config.rate || '';
-        
-        const daysInput = document.getElementById('days-input');
-        if (daysInput) daysInput.value = state.config.daysWorked || '';
-        
-        const daysGroup = document.getElementById('days-group');
-        if (daysGroup) {
-            daysGroup.style.display = regime === 'daily' ? 'block' : 'none';
-        }
-        
-        const rateLabel = document.getElementById('rate-label');
-        if (rateLabel) {
-            rateLabel.textContent = regime === 'daily' ? 'Valor por Dia (R$)' : 'Salário Mensal (R$)';
-        }
     }
 }
 
 // ============================================
 // FUNÇÕES DE REGIME E CONFIGURAÇÃO
 // ============================================
-
-function toggleRegime(e) {
-    document.querySelectorAll('.btn-regime').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active');
-    
-    const regime = e.target.dataset.regime;
-    const daysGroup = document.getElementById('days-group');
-    if (daysGroup) {
-        daysGroup.style.display = regime === 'daily' ? 'block' : 'none';
-    }
-    
-    const rateLabel = document.getElementById('rate-label');
-    if (rateLabel) {
-        rateLabel.textContent = regime === 'daily' ? 'Valor por Dia (R$)' : 'Salário Mensal (R$)';
-    }
-}
 
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
@@ -901,33 +758,17 @@ function showToast(message, type = 'success') {
 }
 
 function saveConfig() {
-    const activeRegime = document.querySelector('.btn-regime.active');
-    if (!activeRegime) {
-        showToast('Selecione um regime.', 'error');
-        return;
-    }
-
-    const regime = activeRegime.dataset.regime;
     const rateInput = document.getElementById('rate-input');
-    const daysInput = document.getElementById('days-input');
-    
     const rate = parseFloat(rateInput ? rateInput.value : '0');
-    const days = parseInt(daysInput ? daysInput.value : '0') || 0;
 
     if (!rate || rate <= 0) {
         showToast('Insira um valor válido.', 'error');
         return;
     }
 
-    if (regime === 'daily' && days <= 0) {
-        showToast('Informe os dias trabalhados.', 'error');
-        return;
-    }
-
     const config = {
-        regime,
         rate,
-        daysWorked: regime === 'daily' ? days : 0
+        daysWorked: 0
     };
 
     storage.saveConfig(config);
@@ -967,10 +808,7 @@ function updateUI() {
     // Atualizar informações de dias
     const workInfo = document.getElementById('work-info');
     if (workInfo) {
-        workInfo.textContent = 
-            state.config.regime === 'daily' 
-                ? `${state.config.daysWorked} dias trabalhados · R$ ${formatBRL(state.config.rate)}/dia`
-                : `Salário mensal · R$ ${formatBRL(state.config.rate)}`;
+        workInfo.textContent = `${state.config.daysWorked} dias trabalhados · R$ ${formatBRL(state.config.rate)}/dia`;
     }
 
     const daysCount = document.getElementById('days-count');
@@ -980,7 +818,7 @@ function updateUI() {
 
     const dayButtons = document.getElementById('day-buttons');
     if (dayButtons) {
-        dayButtons.style.display = state.config.regime === 'daily' ? 'block' : 'none';
+        dayButtons.style.display = 'block';
     }
 
     // Calcular totais
@@ -1009,10 +847,6 @@ function updateUI() {
     renderTransactions();
     renderCalendar(currentMonth, currentYear);
 
-    if (window.Chart && state.config) {
-        chartManager.updateCharts(state.transactions, state.config);
-    }
-
     notificationSystem.notifyLowBalance(totals.netBalance, 100);
     notificationSystem.notifyDueThirdParty(state.transactions);
 }
@@ -1029,9 +863,7 @@ function calculateTotals() {
         return { gross: 0, discounts: 0, toReceive: 0, recovered: 0, netBalance: 0, realBalance: 0 };
     }
 
-    const gross = config.regime === 'monthly' 
-        ? config.rate 
-        : config.rate * (config.daysWorked || 0);
+    const gross = config.rate * (config.daysWorked || 0);
 
     const discounts = transactions
         .filter(t => t.type === 'personal_discount')
@@ -1235,10 +1067,8 @@ function addDay() {
     workedDays[dateKey] = true;
     writeWorkedDays(workedDays);
 
-    if (state.config.regime === 'daily') {
-        state.config.daysWorked = (parseInt(state.config.daysWorked || 0, 10) + 1);
-        storage.saveConfig(state.config);
-    }
+    state.config.daysWorked = (parseInt(state.config.daysWorked || 0, 10) + 1);
+    storage.saveConfig(state.config);
 
     updateUI();
     showToast('✅ Dia marcado como trabalhado!', 'success');
@@ -1266,7 +1096,7 @@ function removeDay() {
     delete workedDays[dateKey];
     writeWorkedDays(workedDays);
 
-    if (state.config.regime === 'daily' && (parseInt(state.config.daysWorked || 0, 10) > 0)) {
+    if (parseInt(state.config.daysWorked || 0, 10) > 0) {
         state.config.daysWorked = (parseInt(state.config.daysWorked || 0, 10) - 1);
         storage.saveConfig(state.config);
     }
