@@ -32,6 +32,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
 
+    const urlProtocol = new URL(event.request.url).protocol;
+    if (urlProtocol !== 'http:' && urlProtocol !== 'https:') {
+        return;
+    }
+
     event.respondWith(
         caches.match(event.request).then((cachedResponse) => {
             if (cachedResponse) {
