@@ -241,13 +241,12 @@ function updateDashboard() {
     });
     
     const netBalance = totalGross - totalDiscounts;
-    const realBalance = netBalance; // sem pendentes
-    
+    const realBalance = netBalance - totalThirdParty;
+
     // Atualiza cards
     document.getElementById('total-gross').textContent = `R$ ${totalGross.toFixed(2).replace('.', ',')}`;
     document.getElementById('total-discounts').textContent = `R$ ${totalDiscounts.toFixed(2).replace('.', ',')}`;
-    document.getElementById('total-to-receive').textContent = `R$ 0,00`;
-    document.getElementById('total-recovered').textContent = `R$ 0,00`;
+    document.getElementById('total-third-party').textContent = `R$ ${totalThirdParty.toFixed(2).replace('.', ',')}`;
     document.getElementById('net-balance').textContent = `R$ ${netBalance.toFixed(2).replace('.', ',')}`;
     document.getElementById('real-balance').textContent = `R$ ${realBalance.toFixed(2).replace('.', ',')}`;
     
