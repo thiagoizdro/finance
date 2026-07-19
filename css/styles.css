@@ -1,5 +1,5 @@
 /* ============================================
-   styles.css - Versão Completa com Refinamentos
+   styles.css - Versão Simplificada
    ============================================ */
 
 :root {
@@ -16,6 +16,10 @@
     --input-border: #E5E7EB;
     --toast-bg: #111827;
     --toast-text: #FFFFFF;
+    --surface-elevated: #f3f4f6;
+    --surface-muted: #f9fafb;
+    --surface-border: #e5e7eb;
+    --text-muted: #6b7280;
 }
 
 [data-theme="dark"] {
@@ -140,60 +144,6 @@ body {
     box-shadow: 0 15px 40px rgba(15, 23, 42, 0.08);
 }
 
-.charts-section {
-    display: grid;
-    gap: 16px;
-    margin: 24px 0;
-}
-
-.chart-card {
-    background: var(--bg-card);
-    padding: 20px;
-    border-radius: 18px;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
-    border: 1px solid var(--card-border);
-}
-
-.chart-card-header {
-    margin-bottom: 16px;
-}
-
-.chart-card-header h2 {
-    margin-bottom: 6px;
-    font-size: 18px;
-}
-
-.chart-card-header p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 14px;
-}
-
-.chart-card canvas {
-    width: 100% !important;
-    max-height: 320px;
-}
-
-@media (min-width: 768px) {
-    .charts-section {
-        grid-template-columns: 1.2fr 0.8fr;
-    }
-}
-
-@media (min-width: 1024px) {
-    .grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    .dashboard-header {
-        align-items: center;
-    }
-
-    .summary-banner .summary-values {
-        gap: 16px;
-    }
-}
-
 /* ============================================
    FORM
    ============================================ */
@@ -306,7 +256,7 @@ body {
 }
 
 /* ============================================
-   BOTÃO DE EXPORTAR (Premium)
+   BOTÃO DE EXPORTAR
    ============================================ */
 #btn-export {
     background: #10B981;
@@ -543,10 +493,9 @@ body {
     border: 2px solid transparent;
     position: relative;
     user-select: none;
-    min-height: 40px;
 }
 
-.calendar-day:hover:not(.empty):not(.other-month) {
+.calendar-day:hover:not(.empty) {
     transform: scale(1.05);
     background: var(--surface-elevated);
 }
@@ -557,7 +506,7 @@ body {
 }
 
 .calendar-day.other-month {
-    opacity: 0.35;
+    opacity: 0.3;
 }
 
 .calendar-day.worked {
@@ -572,7 +521,7 @@ body {
     top: 2px;
     right: 5px;
     font-size: 10px;
-    opacity: 0.7;
+    opacity: 0.6;
 }
 
 .calendar-day.today {
@@ -581,6 +530,11 @@ body {
 }
 
 .calendar-day.selected {
+    border-color: #8B5CF6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+}
+
+.calendar-day.selected.worked {
     border-color: #8B5CF6;
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
 }
@@ -594,7 +548,6 @@ body {
     border-top: 1px solid var(--card-border);
     font-size: 13px;
     color: var(--text-secondary);
-    flex-wrap: wrap;
 }
 
 .legend-dot {
@@ -629,7 +582,6 @@ body {
     border-radius: 10px;
     font-size: 14px;
     color: var(--text-secondary);
-    gap: 8px;
 }
 
 .calendar-stats strong {
@@ -640,10 +592,10 @@ body {
    DAY BUTTONS
    ============================================ */
 .day-buttons {
-    background: var(--surface-muted);
+    background: var(--bg-card);
     padding: 16px;
     border-radius: 12px;
-    margin-top: 12px;
+    margin-bottom: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     border: 1px solid var(--card-border);
 }
@@ -749,7 +701,7 @@ body {
 }
 
 /* ============================================
-   TRANSACTION ITEMS (com hover melhorado)
+   TRANSACTION ITEMS
    ============================================ */
 .transaction-item {
     background: var(--bg-card);
@@ -764,7 +716,6 @@ body {
     transition: all 0.3s ease;
 }
 
-/* HOVER Premium */
 .transaction-item:hover {
     background: var(--surface-elevated);
     border-color: var(--surface-border);
@@ -833,67 +784,6 @@ body {
 }
 
 /* ============================================
-   FILTER BUTTONS
-   ============================================ */
-.filter-btn {
-    padding: 8px 16px;
-    border: 2px solid var(--surface-border);
-    border-radius: 20px;
-    background: var(--bg-card);
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.filter-btn:hover {
-    background: var(--surface-elevated);
-    color: var(--text-primary);
-    transform: scale(1.02);
-}
-
-.filter-btn.active {
-    background: #10B981;
-    color: #FFF;
-    border-color: #10B981;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-}
-
-/* ============================================
-   TOAST
-   ============================================ */
-.toast {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    background: #111827;
-    color: #fff;
-    padding: 12px 20px;
-    border-radius: 999px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    opacity: 0;
-    transform: translateY(8px);
-    pointer-events: none;
-    transition: all 0.3s ease;
-    z-index: 2000;
-    font-weight: 500;
-}
-
-.toast.show {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.toast.success {
-    background: #047857;
-}
-
-.toast.error {
-    background: #DC2626;
-}
-
-/* ============================================
    MODAL
    ============================================ */
 .modal {
@@ -951,6 +841,39 @@ body {
 .btn-close:hover {
     color: var(--text-primary);
     transform: rotate(90deg);
+}
+
+/* ============================================
+   TOAST
+   ============================================ */
+.toast {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    background: #111827;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 2000;
+    font-weight: 500;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.success {
+    background: #047857;
+}
+
+.toast.error {
+    background: #DC2626;
 }
 
 /* ============================================
@@ -1025,6 +948,28 @@ body {
         flex-direction: column;
         gap: 4px;
     }
+
+    .calendar-day {
+        font-size: 13px;
+        border-radius: 8px;
+    }
+
+    .calendar-weekdays {
+        font-size: 11px;
+    }
+
+    .calendar-stats {
+        flex-direction: column;
+        gap: 4px;
+        font-size: 13px;
+        text-align: center;
+    }
+
+    .calendar-legend {
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 12px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1057,6 +1002,21 @@ body {
 
     .transaction-amount {
         font-size: 14px;
+    }
+
+    .calendar-day {
+        font-size: 12px;
+        border-radius: 6px;
+        min-height: 32px;
+    }
+
+    .calendar-days {
+        gap: 2px;
+        padding: 2px;
+    }
+
+    .calendar-header h2 {
+        font-size: 16px;
     }
 }
 
