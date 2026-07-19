@@ -226,31 +226,28 @@ function updateDashboard() {
     const totalWorkedDays = Object.keys(workedDays).filter(key => workedDays[key] === true).length;
     const totalGross = totalWorkedDays * dailyRate;
     
-    // Calcula descontos
+    // Calcula descontos (simplificado - todos os terceiros são descontos)
     let totalDiscounts = 0;
-    let totalToReceive = 0;
-    let totalRecovered = 0;
+    let totalThirdParty = 0;
     
     transactions.forEach(t => {
+        const amount = parseFloat(t.amount) || 0;
         if (t.type === 'personal_discount') {
-            totalDiscounts += parseFloat(t.amount) || 0;
+            totalDiscounts += amount;
         } else if (t.type === 'third_party') {
-            if (t.status === 'pending') {
-                totalToReceive += parseFloat(t.amount) || 0;
-            } else if (t.status === 'received') {
-                totalRecovered += parseFloat(t.amount) || 0;
-            }
+            totalDiscounts += amount;
+            totalThirdParty += amount;
         }
     });
     
     const netBalance = totalGross - totalDiscounts;
-    const realBalance = netBalance - totalToReceive;
+    const realBalance = netBalance; // sem pendentes
     
     // Atualiza cards
     document.getElementById('total-gross').textContent = `R$ ${totalGross.toFixed(2).replace('.', ',')}`;
     document.getElementById('total-discounts').textContent = `R$ ${totalDiscounts.toFixed(2).replace('.', ',')}`;
-    document.getElementById('total-to-receive').textContent = `R$ ${totalToReceive.toFixed(2).replace('.', ',')}`;
-    document.getElementById('total-recovered').textContent = `R$ ${totalRecovered.toFixed(2).replace('.', ',')}`;
+    document.getElementById('total-to-receive').textContent = `R$ 0,00`;
+    document.getElementById('total-recovered').textContent = `R$ 0,00`;
     document.getElementById('net-balance').textContent = `R$ ${netBalance.toFixed(2).replace('.', ',')}`;
     document.getElementById('real-balance').textContent = `R$ ${realBalance.toFixed(2).replace('.', ',')}`;
     
@@ -265,7 +262,7 @@ function updateDashboard() {
             <span>💰 Bruto: R$ ${totalGross.toFixed(2).replace('.', ',')}</span>
             <span>➖ Descontos: R$ ${totalDiscounts.toFixed(2).replace('.', ',')}</span>
             <span>⚖️ Líquido: R$ ${netBalance.toFixed(2).replace('.', ',')}</span>
-            <span>💳 Real: R$ ${realBalance.toFixed(2).replace('.', ',')}</span>
+            ${totalThirdParty > 0 ? `<span>👥 Terceiros: R$ ${totalThirdParty.toFixed(2).replace('.', ',')}</span>` : ''}
         </div>
     `;
     
@@ -303,15 +300,15 @@ function renderTransactions(filter = '') {
     
     list.innerHTML = filtered.map(t => {
         const typeLabel = t.type === 'personal_discount' ? '👤 Desconto Pessoal' : '👥 Terceiro';
-        const statusLabel = t.status === 'received' ? '✅ Recebido' : '⏳ Pendente';
         const dateFormatted = new Date(t.date).toLocaleDateString('pt-BR');
+        const personDisplay = t.person ? ` · 👤 ${t.person}` : '';
         
         return `
             <div class="transaction-item" data-id="${t.id}">
                 <div class="transaction-info">
                     <div class="transaction-desc">${t.description}</div>
                     ${t.person ? `<div class="transaction-person">👤 ${t.person}</div>` : ''}
-                    <div class="transaction-date">${dateFormatted} · ${typeLabel} · ${statusLabel}</div>
+                    <div class="transaction-date">${dateFormatted} · ${typeLabel}${personDisplay}</div>
                 </div>
                 <div class="transaction-amount">- R$ ${parseFloat(t.amount).toFixed(2).replace('.', ',')}</div>
                 <div class="transaction-actions">
@@ -331,6 +328,10 @@ function openModal(editData = null) {
     const modal = document.getElementById('modal');
     modal.classList.add('active');
     
+    // Reset do campo de nome
+    const personInput = document.getElementById('modal-person');
+    const personLabel = document.getElementById('person-label');
+    
     if (editData) {
         document.getElementById('modal-title').textContent = 'Editar Movimentação';
         document.getElementById('modal-description').value = editData.description || '';
@@ -343,16 +344,13 @@ function openModal(editData = null) {
             btn.classList.toggle('active', btn.dataset.type === editData.type);
         });
         
-        // Define o status
+        // Atualiza label do campo nome
         if (editData.type === 'third_party') {
-            document.getElementById('person-group').style.display = 'block';
-            document.getElementById('status-group').style.display = 'block';
-            document.querySelectorAll('.btn-status').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.status === editData.status);
-            });
+            personLabel.textContent = '👤 Nome do Terceiro *';
+            personInput.placeholder = 'Digite o nome do terceiro';
         } else {
-            document.getElementById('person-group').style.display = 'none';
-            document.getElementById('status-group').style.display = 'none';
+            personLabel.textContent = 'Nome (opcional)';
+            personInput.placeholder = 'Digite o nome';
         }
     } else {
         document.getElementById('modal-title').textContent = 'Nova Movimentação';
@@ -360,11 +358,15 @@ function openModal(editData = null) {
         document.getElementById('modal-amount').value = '';
         document.getElementById('modal-person').value = '';
         editingId = null;
+        
+        // Reseta para o primeiro tipo (Desconto Pessoal)
         document.querySelectorAll('.btn-type').forEach((btn, index) => {
             btn.classList.toggle('active', index === 0);
         });
-        document.getElementById('person-group').style.display = 'none';
-        document.getElementById('status-group').style.display = 'none';
+        
+        // Atualiza label do campo nome
+        personLabel.textContent = 'Nome (opcional)';
+        personInput.placeholder = 'Digite o nome';
     }
 }
 
@@ -378,8 +380,8 @@ function saveTransaction() {
     const amount = parseFloat(document.getElementById('modal-amount').value);
     const type = document.querySelector('.btn-type.active')?.dataset.type || 'personal_discount';
     const person = document.getElementById('modal-person').value.trim();
-    const status = document.querySelector('.btn-status.active')?.dataset.status || 'pending';
     
+    // Validações
     if (!description) {
         showToast('Por favor, preencha a descrição!', 'error');
         return;
@@ -390,8 +392,9 @@ function saveTransaction() {
         return;
     }
     
+    // Valida nome do terceiro apenas se for do tipo third_party
     if (type === 'third_party' && !person) {
-        showToast('Por favor, informe o nome da pessoa!', 'error');
+        showToast('Por favor, informe o nome do terceiro!', 'error');
         return;
     }
     
@@ -406,8 +409,7 @@ function saveTransaction() {
                 description,
                 amount,
                 type,
-                person: type === 'third_party' ? person : '',
-                status: type === 'third_party' ? status : 'pending'
+                person: type === 'third_party' ? person : ''
             };
         }
         showToast('✅ Movimentação atualizada!', 'success');
@@ -419,7 +421,6 @@ function saveTransaction() {
             amount,
             type,
             person: type === 'third_party' ? person : '',
-            status: type === 'third_party' ? status : 'pending',
             date: new Date().toISOString()
         };
         transactions.push(newTransaction);
@@ -643,23 +644,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === e.currentTarget) closeModal();
     });
     
-    // Tipo de transação
+    // Tipo de transação (atualizado)
     document.querySelectorAll('.btn-type').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.btn-type').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             
             const type = btn.dataset.type;
-            document.getElementById('person-group').style.display = type === 'third_party' ? 'block' : 'none';
-            document.getElementById('status-group').style.display = type === 'third_party' ? 'block' : 'none';
-        });
-    });
-    
-    // Status da transação
-    document.querySelectorAll('.btn-status').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.btn-status').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            const personLabel = document.getElementById('person-label');
+            const personInput = document.getElementById('modal-person');
+            
+            if (type === 'third_party') {
+                personLabel.textContent = '👤 Nome do Terceiro *';
+                personInput.placeholder = 'Digite o nome do terceiro';
+                personInput.required = true;
+            } else {
+                personLabel.textContent = 'Nome (opcional)';
+                personInput.placeholder = 'Digite o nome';
+                personInput.required = false;
+            }
         });
     });
     
