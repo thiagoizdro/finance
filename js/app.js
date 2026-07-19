@@ -19,7 +19,6 @@ function renderCalendar(month, year) {
     const daysContainer = document.getElementById('calendar-days');
     const monthYearDisplay = document.getElementById('calendar-month-year');
     const monthDaysCount = document.getElementById('month-days-count');
-    const monthTotal = document.getElementById('month-total');
     
     const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
                         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -71,7 +70,6 @@ function renderCalendar(month, year) {
     
     // Atualiza estatísticas
     monthDaysCount.textContent = workedCount;
-    monthTotal.textContent = `R$ ${monthTotalAmount.toFixed(2).replace('.', ',')}`;
     
     const dayButtons = document.getElementById('day-buttons');
     if (workedCount > 0 || Object.keys(workedDays).length > 0) {
