@@ -471,6 +471,214 @@ const state = {
     editingId: null
 };
 
+const WORKED_DAYS_STORAGE_KEY = 'workedDays';
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let selectedDate = null;
+
+function readWorkedDays() {
+    try {
+        return JSON.parse(localStorage.getItem(WORKED_DAYS_STORAGE_KEY) || '{}');
+    } catch (e) {
+        console.error('Erro ao ler dias trabalhados:', e);
+        return {};
+    }
+}
+
+function writeWorkedDays(workedDays) {
+    localStorage.setItem(WORKED_DAYS_STORAGE_KEY, JSON.stringify(workedDays));
+}
+
+function getMonthName(month) {
+    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    return monthNames[month] || monthNames[0];
+}
+
+function renderCalendar(month, year) {
+    const daysContainer = document.getElementById('calendar-days');
+    const monthYearDisplay = document.getElementById('calendar-month-year');
+    const monthDaysCount = document.getElementById('month-days-count');
+    const monthTotal = document.getElementById('month-total');
+
+    if (!daysContainer || !monthYearDisplay || !monthDaysCount || !monthTotal) return;
+
+    monthYearDisplay.textContent = `${getMonthName(month)} ${year}`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+    const workedDays = readWorkedDays();
+    const config = state.config || {};
+    const dailyRate = parseFloat(config.rate) || 0;
+
+    daysContainer.innerHTML = '';
+
+    for (let i = firstDay - 1; i >= 0; i--) {
+        const day = daysInPrevMonth - i;
+        const cell = createDayCell(day, year, month - 1, 'other-month');
+        daysContainer.appendChild(cell);
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isToday = (d, m, y) => d === today.getDate() && m === today.getMonth() && y === today.getFullYear();
+
+    let workedCount = 0;
+    let monthTotalAmount = 0;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const isWorked = workedDays[dateKey] === true;
+
+        if (isWorked) {
+            workedCount++;
+            monthTotalAmount += dailyRate;
+        }
+
+        const cell = createDayCell(d, year, month, '', isWorked, isToday(d, month, year));
+        daysContainer.appendChild(cell);
+    }
+
+    const totalCells = daysContainer.children.length;
+    const remainingCells = (7 - (totalCells % 7)) % 7;
+    for (let i = 1; i <= remainingCells; i++) {
+        const cell = createDayCell(i, year, month + 1, 'other-month');
+        daysContainer.appendChild(cell);
+    }
+
+    monthDaysCount.textContent = workedCount;
+    monthTotal.textContent = `R$ ${monthTotalAmount.toFixed(2).replace('.', ',')}`;
+}
+
+function createDayCell(day, year, month, className = '', isWorked = false, isToday = false) {
+    const cell = document.createElement('div');
+    cell.className = `calendar-day${className ? ' ' + className : ''}`;
+    cell.textContent = day;
+
+    if (isWorked) cell.classList.add('worked');
+    if (isToday) cell.classList.add('today');
+
+    const dateObj = new Date(year, month, day);
+    const dateKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    cell.dataset.date = dateKey;
+    cell.dataset.day = day;
+    cell.dataset.month = month;
+    cell.dataset.year = year;
+
+    cell.addEventListener('click', () => {
+        if (cell.classList.contains('empty') || cell.classList.contains('other-month')) return;
+
+        document.querySelectorAll('.calendar-day.selected').forEach(el => el.classList.remove('selected'));
+        cell.classList.add('selected');
+
+        selectedDate = {
+            date: dateKey,
+            day,
+            month,
+            year,
+            isWorked
+        };
+
+        updateSelectedDayInfo(selectedDate);
+
+        const dayButtons = document.getElementById('day-buttons');
+        if (dayButtons) {
+            dayButtons.style.display = 'block';
+        }
+    });
+
+    return cell;
+}
+
+function updateSelectedDayInfo(selected) {
+    const display = document.getElementById('selected-date-display');
+    const addBtn = document.getElementById('add-day');
+    const removeBtn = document.getElementById('remove-day');
+
+    if (!display || !addBtn || !removeBtn) return;
+
+    if (!selected) {
+        display.textContent = '--/--/----';
+        addBtn.style.display = 'none';
+        removeBtn.style.display = 'none';
+        return;
+    }
+
+    const date = new Date(selected.year, selected.month, selected.day);
+    display.textContent = date.toLocaleDateString('pt-BR');
+
+    const workedDays = readWorkedDays();
+    const isWorked = workedDays[selected.date] === true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isFuture = date > today;
+
+    if (isFuture) {
+        addBtn.textContent = '⏳ Dia futuro';
+        addBtn.disabled = true;
+        addBtn.style.opacity = '0.55';
+        addBtn.style.cursor = 'default';
+        removeBtn.style.display = 'none';
+        return;
+    }
+
+    if (isWorked) {
+        addBtn.textContent = '✅ Já está marcado';
+        addBtn.disabled = true;
+        addBtn.style.opacity = '0.55';
+        addBtn.style.cursor = 'default';
+        removeBtn.style.display = 'block';
+    } else {
+        addBtn.textContent = '✅ Marcar como trabalhado';
+        addBtn.disabled = false;
+        addBtn.style.opacity = '1';
+        addBtn.style.cursor = 'pointer';
+        removeBtn.style.display = 'none';
+    }
+}
+
+function changeMonth(delta) {
+    currentMonth += delta;
+    if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+    } else if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+    }
+    renderCalendar(currentMonth, currentYear);
+}
+
+function migrateWorkedDaysFromConfig() {
+    const config = state.config || {};
+    const days = parseInt(config.daysWorked || 0, 10);
+    const workedDays = readWorkedDays();
+
+    if (Object.keys(workedDays).length === 0 && days > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const month = today.getMonth();
+        const year = today.getFullYear();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        let workDaysCount = 0;
+        const newWorkedDays = {};
+
+        for (let d = 1; d <= daysInMonth && workDaysCount < days; d++) {
+            const date = new Date(year, month, d);
+            if (date <= today) {
+                const dayOfWeek = date.getDay();
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    newWorkedDays[key] = true;
+                    workDaysCount++;
+                }
+            }
+        }
+
+        writeWorkedDays(newWorkedDays);
+    }
+}
+
 // ============================================
 // PARTE 3: FUNÇÕES DO APP
 // ============================================
@@ -478,6 +686,7 @@ const state = {
 function init() {
     console.log('🚀 Iniciando app...');
     loadData();
+    migrateWorkedDaysFromConfig();
     setupEventListeners();
 
     loadTheme();
@@ -534,6 +743,16 @@ function setupEventListeners() {
     const removeDayBtn = document.getElementById('remove-day');
     if (removeDayBtn) {
         removeDayBtn.addEventListener('click', removeDay);
+    }
+
+    const prevMonthBtn = document.getElementById('prev-month');
+    if (prevMonthBtn) {
+        prevMonthBtn.addEventListener('click', () => changeMonth(-1));
+    }
+
+    const nextMonthBtn = document.getElementById('next-month');
+    if (nextMonthBtn) {
+        nextMonthBtn.addEventListener('click', () => changeMonth(1));
     }
 
     const newTransactionBtn = document.getElementById('new-transaction');
@@ -788,6 +1007,7 @@ function updateUI() {
 
     // Renderizar transações
     renderTransactions();
+    renderCalendar(currentMonth, currentYear);
 
     if (window.Chart && state.config) {
         chartManager.updateCharts(state.transactions, state.config);
@@ -987,28 +1207,72 @@ function exportToCSV() {
 
 function addDay() {
     if (!state.config) {
-        alert('Configure o app primeiro!');
+        showToast('Configure o app primeiro!', 'error');
         return;
     }
-    state.config.daysWorked += 1;
-    storage.saveConfig(state.config);
+
+    if (!selectedDate) {
+        showToast('Selecione um dia no calendário.', 'info');
+        return;
+    }
+
+    const dateKey = selectedDate.date;
+    const workedDays = readWorkedDays();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDateObj = new Date(selectedDate.year, selectedDate.month, selectedDate.day);
+
+    if (workedDays[dateKey]) {
+        showToast('Este dia já está marcado como trabalhado.', 'info');
+        return;
+    }
+
+    if (selectedDateObj > today) {
+        showToast('Não é possível marcar dias futuros.', 'error');
+        return;
+    }
+
+    workedDays[dateKey] = true;
+    writeWorkedDays(workedDays);
+
+    if (state.config.regime === 'daily') {
+        state.config.daysWorked = (parseInt(state.config.daysWorked || 0, 10) + 1);
+        storage.saveConfig(state.config);
+    }
+
     updateUI();
+    showToast('✅ Dia marcado como trabalhado!', 'success');
 }
 
 function removeDay() {
     if (!state.config) {
-        alert('Configure o app primeiro!');
+        showToast('Configure o app primeiro!', 'error');
         return;
     }
-    if (state.config.daysWorked <= 0) {
-        showToast('Não há dias para remover.', 'error');
+
+    if (!selectedDate) {
+        showToast('Selecione um dia no calendário.', 'info');
         return;
     }
-    if (confirm(`Deseja remover 1 dia trabalhado?\n\nVocê tem ${state.config.daysWorked} dia(s) registrado(s).`)) {
-        state.config.daysWorked -= 1;
+
+    const dateKey = selectedDate.date;
+    const workedDays = readWorkedDays();
+
+    if (!workedDays[dateKey]) {
+        showToast('Este dia não está marcado como trabalhado.', 'info');
+        return;
+    }
+
+    delete workedDays[dateKey];
+    writeWorkedDays(workedDays);
+
+    if (state.config.regime === 'daily' && (parseInt(state.config.daysWorked || 0, 10) > 0)) {
+        state.config.daysWorked = (parseInt(state.config.daysWorked || 0, 10) - 1);
         storage.saveConfig(state.config);
-        updateUI();
     }
+
+    updateUI();
+    showToast('❌ Dia desmarcado!', 'success');
 }
 
 // ============================================

@@ -149,14 +149,42 @@
                     </div>
                 </div>
 
-                <!-- Botões Dias Trabalhados -->
-                <div class="day-buttons" id="day-buttons" style="display:none;">
-                    <div class="day-info">
-                        <span>Dias Trabalhados: <strong id="days-count">0</strong></span>
-                    </div>
-                    <div class="day-actions">
-                        <button id="add-day" class="btn-day add">➕ Adicionar Dia</button>
-                        <button id="remove-day" class="btn-day remove">➖ Remover Dia</button>
+                <div class="calendar-section">
+                    <div class="card calendar-card">
+                        <div class="calendar-header">
+                            <button id="prev-month" class="btn-icon" type="button">◀</button>
+                            <h2 id="calendar-month-year">Janeiro 2026</h2>
+                            <button id="next-month" class="btn-icon" type="button">▶</button>
+                        </div>
+                        <div class="calendar-weekdays">
+                            <span>Dom</span>
+                            <span>Seg</span>
+                            <span>Ter</span>
+                            <span>Qua</span>
+                            <span>Qui</span>
+                            <span>Sex</span>
+                            <span>Sáb</span>
+                        </div>
+                        <div id="calendar-days" class="calendar-days"></div>
+                        <div class="calendar-legend">
+                            <span><span class="legend-dot worked"></span> Trabalhado</span>
+                            <span><span class="legend-dot today"></span> Hoje</span>
+                            <span><span class="legend-dot future"></span> Futuro</span>
+                        </div>
+                        <div class="calendar-stats">
+                            <span>📊 Dias trabalhados no mês: <strong id="month-days-count">0</strong></span>
+                            <span>💰 Total do mês: <strong id="month-total">R$ 0,00</strong></span>
+                        </div>
+
+                        <div class="day-buttons" id="day-buttons" style="display:none;">
+                            <div class="day-info">
+                                <span>Dia selecionado: <strong id="selected-date-display">--/--/----</strong></span>
+                            </div>
+                            <div class="day-actions">
+                                <button id="add-day" class="btn-day add" type="button">✅ Marcar como trabalhado</button>
+                                <button id="remove-day" class="btn-day remove" type="button">❌ Desmarcar</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

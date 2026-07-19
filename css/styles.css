@@ -487,13 +487,163 @@ body {
 }
 
 /* ============================================
+   CALENDÁRIO
+   ============================================ */
+.calendar-section {
+    margin: 20px 0;
+}
+
+.calendar-card {
+    padding: 20px;
+}
+
+.calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.calendar-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    padding: 4px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 2px solid transparent;
+    position: relative;
+    user-select: none;
+    min-height: 40px;
+}
+
+.calendar-day:hover:not(.empty):not(.other-month) {
+    transform: scale(1.05);
+    background: var(--surface-elevated);
+}
+
+.calendar-day.empty {
+    cursor: default;
+    background: transparent;
+}
+
+.calendar-day.other-month {
+    opacity: 0.35;
+}
+
+.calendar-day.worked {
+    background: #10B981;
+    color: #FFFFFF;
+    border-color: #10B981;
+}
+
+.calendar-day.worked::after {
+    content: "✓";
+    position: absolute;
+    top: 2px;
+    right: 5px;
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+.calendar-day.today {
+    border-color: #3B82F6;
+    font-weight: 700;
+}
+
+.calendar-day.selected {
+    border-color: #8B5CF6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+}
+
+.calendar-legend {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--card-border);
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.legend-dot.worked {
+    background: #10B981;
+}
+
+.legend-dot.today {
+    background: transparent;
+    border: 2px solid #3B82F6;
+}
+
+.legend-dot.future {
+    background: var(--bg-card);
+    border: 2px solid var(--card-border);
+}
+
+.calendar-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: var(--surface-muted);
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    gap: 8px;
+}
+
+.calendar-stats strong {
+    color: var(--text-primary);
+}
+
+/* ============================================
    DAY BUTTONS
    ============================================ */
 .day-buttons {
-    background: var(--bg-card);
+    background: var(--surface-muted);
     padding: 16px;
     border-radius: 12px;
-    margin-bottom: 12px;
+    margin-top: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     border: 1px solid var(--card-border);
 }
