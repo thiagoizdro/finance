@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#10B981">
+    <meta name="theme-color" content="#233A2E">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Finance App</title>
+    <title>Caderneta — Controle de Diárias</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="manifest" href="manifest.json">
 </head>
@@ -22,27 +25,30 @@
         }
     </script>
     <div id="toast" class="toast" aria-live="polite"></div>
+
     <div id="app">
         <!-- Tela de Configuração -->
         <div id="config-screen" class="screen active">
-            <div class="container">
-                <div class="header">
-                    <div class="icon">💰</div>
-                    <h1>Configuração Financeira</h1>
-                    <p>Defina o valor da sua diária</p>
+            <div class="container container-narrow">
+                <div class="intro">
+                    <span class="eyebrow">Caderneta digital</span>
+                    <div class="stamp-mark" aria-hidden="true">R$</div>
+                    <h1>Qual é a sua diária?</h1>
+                    <p>Esse valor é a base de todo o seu controle — vamos usá-lo para calcular o que você ganha a cada dia marcado.</p>
                 </div>
 
-                <div class="card">
+                <div class="card ledger-card">
                     <div class="form-group">
-                        <label>Valor da Diária (R$)</label>
-                        <input type="number" id="rate-input" placeholder="0,00" step="0.01" min="0">
-                        <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
-                            💡 Este valor será usado para calcular seu salário com base nos dias trabalhados
-                        </small>
+                        <label for="rate-input">Valor da diária</label>
+                        <div class="input-affix">
+                            <span class="affix">R$</span>
+                            <input type="number" id="rate-input" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
+                        </div>
+                        <small class="hint">Você pode alterar esse valor depois, nas configurações.</small>
                     </div>
 
                     <button id="save-config" class="btn-primary">
-                        💾 Iniciar Aplicativo
+                        Começar a registrar
                     </button>
                 </div>
             </div>
@@ -53,61 +59,48 @@
             <div class="container">
                 <!-- Header -->
                 <div class="dashboard-header">
-                    <div>
-                        <h1>💰 Dashboard</h1>
-                        <p id="work-info">0 dias trabalhados · R$ 0,00/dia</p>
+                    <div class="header-text">
+                        <span class="eyebrow">Caderneta digital</span>
+                        <h1 id="work-info">0 dias · R$ 0,00/dia</h1>
                     </div>
-                    <div class="dashboard-actions">
-                        <button id="theme-toggle" class="btn-icon" title="Alterar tema">🌙</button>
-                        <button id="notifications-btn" class="btn-icon" title="Ativar notificações">🔔</button>
-                        <button id="restore-backup-btn" class="btn-icon" title="Restaurar backup">💾</button>
-                        <button id="reset-btn" class="btn-icon" title="Configurações">⚙️</button>
+                    <div class="dashboard-actions" role="toolbar" aria-label="Ações">
+                        <button id="theme-toggle" class="btn-icon" title="Alterar tema" aria-label="Alterar tema">🌙</button>
+                        <button id="notifications-btn" class="btn-icon" title="Ativar lembretes" aria-label="Ativar lembretes">🔔</button>
+                        <button id="export-backup-btn" class="btn-icon" title="Exportar backup" aria-label="Exportar backup">📤</button>
+                        <button id="restore-backup-btn" class="btn-icon" title="Restaurar backup" aria-label="Restaurar backup">📥</button>
+                        <button id="reset-btn" class="btn-icon" title="Configurações" aria-label="Configurações">⚙️</button>
                     </div>
                 </div>
 
                 <div class="search-bar">
-                    <span class="search-icon">🔍</span>
+                    <span class="search-icon" aria-hidden="true">🔍</span>
                     <input type="search" id="transaction-search" placeholder="Buscar por descrição ou nome" autocomplete="off">
                 </div>
 
-                <div class="summary-banner" id="summary-banner"></div>
-
-                <!-- Cards -->
-                <div class="grid">
-                    <div class="card" data-color="green">
-                        <div class="card-icon">💰</div>
-                        <div>
-                            <div class="card-label">Total Bruto</div>
-                            <div class="card-value" id="total-gross">R$ 0,00</div>
-                        </div>
+                <!-- Resumo (recibo) -->
+                <div class="card receipt-card">
+                    <div class="receipt-perf" aria-hidden="true"></div>
+                    <div class="receipt-title">Resumo do período</div>
+                    <div class="receipt-row">
+                        <span>Total bruto</span>
+                        <strong id="ledger-gross">R$ 0,00</strong>
                     </div>
-                    <div class="card" data-color="red">
-                        <div class="card-icon">➖</div>
-                        <div>
-                            <div class="card-label">Descontos</div>
-                            <div class="card-value" id="total-discounts">R$ 0,00</div>
-                        </div>
+                    <div class="receipt-row muted">
+                        <span>Descontos</span>
+                        <strong id="ledger-discounts">− R$ 0,00</strong>
                     </div>
-                    <div class="card" data-color="yellow">
-                        <div class="card-icon">👥</div>
-                        <div>
-                            <div class="card-label">Terceiros</div>
-                            <div class="card-value" id="total-third-party">R$ 0,00</div>
-                        </div>
+                    <div class="receipt-row muted" id="ledger-third-row" style="display:none;">
+                        <span>Repassado a terceiros</span>
+                        <strong id="ledger-third-party">− R$ 0,00</strong>
                     </div>
-                    <div class="card" data-color="purple">
-                        <div class="card-icon">⚖️</div>
-                        <div>
-                            <div class="card-label">Saldo Líquido</div>
-                            <div class="card-value" id="net-balance">R$ 0,00</div>
-                        </div>
+                    <div class="receipt-divider" aria-hidden="true"></div>
+                    <div class="receipt-row total">
+                        <span>Saldo líquido</span>
+                        <strong id="ledger-net">R$ 0,00</strong>
                     </div>
-                    <div class="card" data-color="teal">
-                        <div class="card-icon">💳</div>
-                        <div>
-                            <div class="card-label">Saldo Real</div>
-                            <div class="card-value" id="real-balance">R$ 0,00</div>
-                        </div>
+                    <div class="receipt-row total gold">
+                        <span>Saldo real (seu)</span>
+                        <strong id="ledger-real">R$ 0,00</strong>
                     </div>
                 </div>
 
@@ -115,22 +108,25 @@
                 <div class="calendar-section">
                     <div class="card calendar-card">
                         <div class="calendar-header">
-                            <button id="prev-month" class="btn-icon">◀</button>
-                            <h2 id="calendar-month-year">Janeiro 2026</h2>
-                            <button id="next-month" class="btn-icon">▶</button>
+                            <button id="prev-month" class="btn-icon" aria-label="Mês anterior">◀</button>
+                            <div class="calendar-title">
+                                <span class="eyebrow">Cartão de ponto</span>
+                                <h2 id="calendar-month-year">Janeiro 2026</h2>
+                            </div>
+                            <button id="next-month" class="btn-icon" aria-label="Próximo mês">▶</button>
                         </div>
                         <div class="calendar-weekdays">
-                            <span>Dom</span>
-                            <span>Seg</span>
-                            <span>Ter</span>
-                            <span>Qua</span>
-                            <span>Qui</span>
-                            <span>Sex</span>
-                            <span>Sáb</span>
+                            <span>D</span>
+                            <span>S</span>
+                            <span>T</span>
+                            <span>Q</span>
+                            <span>Q</span>
+                            <span>S</span>
+                            <span>S</span>
                         </div>
                         <div id="calendar-days" class="calendar-days"></div>
                         <div class="calendar-stats">
-                            <div> Dias trabalhados: <strong id="month-days-count">0</strong></div>
+                            <div>Dias trabalhados no mês: <strong id="month-days-count">0</strong></div>
                         </div>
 
                         <div class="calendar-legend">
@@ -138,75 +134,75 @@
                             <span><span class="legend-dot today"></span> Hoje</span>
                             <span><span class="legend-dot future"></span> Futuro</span>
                         </div>
-                    
                     </div>
                 </div>
 
                 <!-- Botões Dias Trabalhados -->
                 <div class="day-buttons" id="day-buttons" style="display:none;">
                     <div class="day-info">
-                        <span>Dia selecionado: <strong id="selected-date-display">--/--/----</strong></span>
+                        Dia selecionado: <strong id="selected-date-display">--/--/----</strong>
                     </div>
                     <div class="day-actions">
-                        <button id="add-day" class="btn-day add">✅ Marcar como trabalhado</button>
-                        <button id="remove-day" class="btn-day remove">❌ Desmarcar</button>
+                        <button id="add-day" class="btn-day add">Marcar como trabalhado</button>
+                        <button id="remove-day" class="btn-day remove">Desmarcar dia</button>
                     </div>
                 </div>
-
-                <!-- Botão Nova Movimentação -->
-                <button id="new-transaction" class="btn-primary btn-full">
-                    ➕ Nova Movimentação
-                </button>
 
                 <!-- Lista de Transações -->
                 <div class="transactions-section">
-                    <h2>Últimos Lançamentos</h2>
+                    <h2>Últimos lançamentos</h2>
                     <div id="transactions-list"></div>
                 </div>
             </div>
+
+            <!-- Botão Nova Movimentação (flutuante) -->
+            <button id="new-transaction" class="fab" aria-label="Nova movimentação" title="Nova movimentação">
+                <span class="fab-icon" aria-hidden="true">+</span>
+            </button>
         </div>
 
         <!-- Modal -->
         <div id="modal" class="modal">
             <div class="modal-content">
+                <div class="modal-handle" aria-hidden="true"></div>
                 <div class="modal-header">
-                    <h2 id="modal-title">Nova Movimentação</h2>
-                    <button id="close-modal" class="btn-close">✕</button>
+                    <h2 id="modal-title">Nova movimentação</h2>
+                    <button id="close-modal" class="btn-close" aria-label="Fechar">✕</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
                         <label>Tipo</label>
                         <div class="btn-group">
                             <button class="btn-type active" data-type="personal_discount">
-                                👤 Desconto Pessoal
+                                Desconto pessoal
                             </button>
                             <button class="btn-type" data-type="third_party">
-                                👥 Terceiro
+                                Terceiro
                             </button>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label>Descrição</label>
-                        <input type="text" id="modal-description" placeholder="Ex: Aluguel, Empréstimo...">
+                        <label for="modal-description">Descrição</label>
+                        <input type="text" id="modal-description" placeholder="Ex: aluguel, empréstimo...">
                     </div>
 
                     <div class="form-group">
-                        <label>Valor (R$)</label>
-                        <input type="number" id="modal-amount" placeholder="0,00" step="0.01" min="0">
+                        <label for="modal-amount">Valor</label>
+                        <div class="input-affix">
+                            <span class="affix">R$</span>
+                            <input type="number" id="modal-amount" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
+                        </div>
                     </div>
 
-                    <!-- Campo de Nome do Terceiro (sempre visível, mas só obrigatório para terceiros) -->
                     <div class="form-group">
-                        <label id="person-label">Nome (opcional)</label>
+                        <label id="person-label" for="modal-person">Nome (opcional)</label>
                         <input type="text" id="modal-person" placeholder="Digite o nome">
-                        <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
-                            💡 Preencha apenas se for uma movimentação de terceiro
-                        </small>
+                        <small class="hint">Preencha apenas se for uma movimentação de terceiro.</small>
                     </div>
 
                     <button id="save-transaction" class="btn-primary btn-full">
-                        💾 Salvar
+                        Salvar movimentação
                     </button>
                 </div>
             </div>
