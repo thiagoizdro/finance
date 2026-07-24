@@ -43,6 +43,10 @@
     --radius-md: 12px;
     --font-display: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
     --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+    /* motion */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] {
@@ -117,7 +121,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
         transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
     }
 }
 
@@ -126,6 +132,10 @@ body {
    ============================================ */
 .screen { display: none; }
 .screen.active { display: block; animation: fadeIn 0.35s ease; }
+
+/* O dashboard tem sua própria coreografia por cartão (ver abaixo),
+   então a tela em si não precisa do fade genérico. */
+.dashboard-screen.active { animation: none; }
 
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
@@ -142,6 +152,23 @@ body {
     60% { transform: scale(0.92) rotate(-2deg); opacity: 1; }
     100% { transform: scale(1) rotate(-2deg); opacity: 1; }
 }
+
+/* Coreografia de entrada dos cartões do painel, tipo folhas
+   sendo colocadas na mesa uma a uma. */
+@keyframes cardSettle {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.dashboard-screen.active .container > * {
+    animation: cardSettle 0.5s var(--ease-out) both;
+}
+.dashboard-screen.active .container > *:nth-child(1) { animation-delay: 0.02s; }
+.dashboard-screen.active .container > *:nth-child(2) { animation-delay: 0.09s; }
+.dashboard-screen.active .container > *:nth-child(3) { animation-delay: 0.16s; }
+.dashboard-screen.active .container > *:nth-child(4) { animation-delay: 0.23s; }
+.dashboard-screen.active .container > *:nth-child(5) { animation-delay: 0.30s; }
+.dashboard-screen.active .container > *:nth-child(6) { animation-delay: 0.36s; }
 
 /* ============================================
    INTRO (config screen)
@@ -162,6 +189,7 @@ body {
     font-size: 22px;
     color: var(--stamp-green);
     transform: rotate(-6deg);
+    animation: stampIn 0.55s var(--ease-spring) 0.1s both;
 }
 
 .eyebrow {
@@ -209,6 +237,10 @@ body {
    ============================================ */
 .form-group { margin-bottom: 20px; }
 .form-group:last-of-type { margin-bottom: 0; }
+
+#person-field.reveal {
+    animation: cardSettle 0.3s var(--ease-out) both;
+}
 
 .form-group label {
     display: block;
@@ -294,10 +326,11 @@ body {
     font-weight: 700;
     font-size: 13.5px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
 
 .btn-group button:hover { border-color: var(--stamp-green); }
+.btn-group button:active { transform: scale(0.95); }
 
 .btn-group button.active {
     background: var(--stamp-green);
@@ -335,12 +368,22 @@ body {
     border-radius: 10px;
     font-size: 17px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s var(--ease-spring), border-color 0.2s ease, background 0.2s ease;
     color: var(--btn-secondary-text);
 }
 
 .btn-icon:hover { border-color: var(--stamp-green); transform: translateY(-1px); }
+.btn-icon:active { transform: scale(0.9); }
 .btn-icon:focus-visible { outline: 2px solid var(--stamp-green); outline-offset: 2px; }
+
+/* Giro suave do ícone ao alternar o tema, como virar uma moeda */
+#theme-toggle.spin { animation: iconSpin 0.5s var(--ease-spring); }
+
+@keyframes iconSpin {
+    from { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(0.85); }
+    to { transform: rotate(360deg) scale(1); }
+}
 
 /* Floating action button */
 .fab {
@@ -360,11 +403,31 @@ body {
     align-items: center;
     justify-content: center;
     transition: transform 0.2s ease, background 0.2s ease;
+    animation: fabBreathe 3.6s ease-in-out infinite;
 }
 
-.fab:hover { background: var(--btn-bg-hover); transform: translateY(-2px); }
-.fab:active { transform: scale(0.95); }
+.fab:hover { background: var(--btn-bg-hover); transform: translateY(-2px); animation-play-state: paused; }
+.fab:active { transform: scale(0.93); }
 .fab-icon { font-size: 28px; line-height: 1; font-weight: 300; }
+
+@keyframes fabBreathe {
+    0%, 100% { box-shadow: 0 10px 24px rgba(47, 111, 78, 0.4); }
+    50% { box-shadow: 0 10px 28px rgba(47, 111, 78, 0.55), 0 0 0 7px rgba(47, 111, 78, 0.10); }
+}
+
+/* Ondulação de carimbo ao tocar no botão de nova movimentação */
+.fab-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.55);
+    transform: scale(0);
+    animation: rippleExpand 0.5s var(--ease-out) forwards;
+    pointer-events: none;
+}
+
+@keyframes rippleExpand {
+    to { transform: scale(2.4); opacity: 0; }
+}
 
 /* ============================================
    DASHBOARD HEADER
@@ -402,6 +465,12 @@ body {
     border-radius: var(--radius-md);
     background: var(--bg-card);
     border: 1px solid var(--card-border);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-bar:focus-within {
+    border-color: var(--stamp-green);
+    box-shadow: 0 0 0 4px rgba(47, 111, 78, 0.10);
 }
 
 .search-icon { font-size: 16px; color: var(--text-muted); }
@@ -469,6 +538,13 @@ body {
 .receipt-divider {
     border-top: 1.5px dashed var(--line);
     margin: 8px 0 4px;
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: lineDraw 0.6s var(--ease-out) 0.3s forwards;
+}
+
+@keyframes lineDraw {
+    to { transform: scaleX(1); }
 }
 
 /* ============================================
@@ -510,7 +586,11 @@ body {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 6px;
+    transition: transform 0.22s var(--ease-out), opacity 0.22s ease;
 }
+
+.calendar-days.slide-out-left { transform: translateX(-16px); opacity: 0; }
+.calendar-days.slide-out-right { transform: translateX(16px); opacity: 0; }
 
 .calendar-day {
     aspect-ratio: 1;
@@ -522,7 +602,7 @@ body {
     font-weight: 600;
     font-family: var(--font-display);
     cursor: pointer;
-    transition: transform 0.15s ease;
+    transition: transform 0.15s ease, border-color 0.15s ease;
     background: transparent;
     color: var(--text-primary);
     border: 1.5px solid transparent;
@@ -534,14 +614,35 @@ body {
     border-color: var(--stamp-green);
 }
 
+.calendar-day:active:not(.empty):not(.other-month) {
+    transform: scale(0.9);
+}
+
 .calendar-day.other-month { opacity: 0.28; cursor: default; }
 
 .calendar-day.worked {
     background: transparent;
     color: var(--stamp-green);
     border: 2.5px solid var(--stamp-green);
-    animation: stampIn 0.32s ease;
+    animation: stampIn 0.4s var(--ease-spring);
     transform: rotate(-2deg);
+}
+
+/* Respingo de tinta que se espalha e some no instante do carimbo */
+.calendar-day.worked::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid var(--stamp-green);
+    opacity: 0;
+    animation: inkRipple 0.55s var(--ease-out);
+    pointer-events: none;
+}
+
+@keyframes inkRipple {
+    0% { transform: scale(0.55); opacity: 0.55; }
+    100% { transform: scale(1.7); opacity: 0; }
 }
 
 .calendar-day.today { border-color: var(--gold); font-weight: 800; }
@@ -598,6 +699,7 @@ body {
     border-radius: var(--radius-md);
     margin-bottom: 16px;
     border: 1px solid var(--card-border);
+    animation: cardSettle 0.4s var(--ease-out) both;
 }
 
 .day-info {
@@ -619,8 +721,10 @@ body {
     font-weight: 700;
     font-size: 13.5px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
 }
+
+.btn-day:active:not(:disabled) { transform: scale(0.95); }
 
 .btn-day.add { background: var(--stamp-green); color: var(--btn-text); }
 .btn-day.add:hover { background: var(--stamp-green-deep); }
@@ -656,6 +760,7 @@ body {
     background: var(--surface-muted);
     font-size: 14px;
     line-height: 1.6;
+    animation: cardSettle 0.4s var(--ease-out) both;
 }
 
 .empty-state strong { color: var(--text-primary); }
@@ -670,10 +775,17 @@ body {
     gap: 12px;
     border: 1px solid var(--card-border);
     border-left: 3px solid var(--stamp-red);
-    transition: transform 0.15s ease;
+    opacity: 0;
+    animation: itemFileIn 0.36s var(--ease-out) forwards;
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
 }
 
-.transaction-item:hover { transform: translateX(2px); }
+.transaction-item:hover { transform: translateX(2px); box-shadow: 0 6px 16px rgba(30, 42, 56, 0.08); }
+
+@keyframes itemFileIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+}
 
 .transaction-info { flex: 1; min-width: 0; }
 .transaction-desc { font-weight: 700; font-size: 14px; color: var(--text-primary); }
@@ -697,11 +809,12 @@ body {
     border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
-    transition: background 0.15s ease;
+    transition: background 0.15s ease, transform 0.15s ease;
     color: var(--text-secondary);
 }
 
 .action-btn:hover { background: var(--surface-elevated); }
+.action-btn:active { transform: scale(0.88); }
 
 /* ============================================
    MODAL — bottom sheet
@@ -710,14 +823,19 @@ body {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(20, 24, 30, 0.5);
+    background: rgba(20, 24, 30, 0);
     z-index: 1000;
     align-items: flex-end;
     justify-content: center;
-    backdrop-filter: blur(3px);
+    backdrop-filter: blur(0px);
+    transition: background 0.25s ease, backdrop-filter 0.25s ease;
 }
 
-.modal.active { display: flex; }
+.modal.active {
+    display: flex;
+    background: rgba(20, 24, 30, 0.5);
+    backdrop-filter: blur(3px);
+}
 
 .modal-content {
     background: var(--bg-card);
@@ -727,8 +845,13 @@ body {
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
-    animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: slideUp 0.38s var(--ease-spring);
     border: 1px solid var(--card-border);
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
 }
 
 .modal-handle {
@@ -755,10 +878,10 @@ body {
     color: var(--text-secondary);
     cursor: pointer;
     padding: 0 6px;
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, transform 0.15s ease;
 }
 
-.btn-close:hover { color: var(--text-primary); }
+.btn-close:hover { color: var(--text-primary); transform: rotate(90deg); }
 
 /* ============================================
    TOAST
@@ -767,7 +890,7 @@ body {
     position: fixed;
     left: 50%;
     bottom: 24px;
-    transform: translateX(-50%) translateY(8px);
+    transform: translateX(-50%) translateY(10px) scale(0.92) rotate(-2deg);
     background: var(--toast-bg);
     color: var(--toast-text);
     padding: 12px 20px;
@@ -775,7 +898,7 @@ body {
     box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     opacity: 0;
     pointer-events: none;
-    transition: all 0.3s ease;
+    transition: transform 0.4s var(--ease-spring), opacity 0.3s ease;
     z-index: 2000;
     font-weight: 600;
     font-size: 14px;
@@ -783,7 +906,7 @@ body {
     text-align: center;
 }
 
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1) rotate(0deg); }
 .toast.success { background: var(--stamp-green-deep); color: #FBF8F0; }
 .toast.error { background: var(--stamp-red); color: #FBF8F0; }
 

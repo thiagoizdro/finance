@@ -15,6 +15,60 @@ let currentMonth = currentDate.getMonth();
 let currentYear = currentDate.getFullYear();
 let selectedDate = null;
 
+// ============================================
+// ANIMAÇÃO — helpers
+// ============================================
+
+function prefersReducedMotion() {
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Anima um número de um valor antigo até um novo, tipo contador de
+// máquina de somar. Guarda o último valor no próprio elemento (dataset)
+// para saber de onde partir na próxima chamada.
+function animateNumber(el, endValue, formatter, duration = 550) {
+    if (!el) return;
+    const startValue = parseFloat(el.dataset.rawValue || '0');
+
+    if (prefersReducedMotion() || Math.abs(endValue - startValue) < 0.005) {
+        el.textContent = formatter(endValue);
+        el.dataset.rawValue = String(endValue);
+        return;
+    }
+
+    const startTime = performance.now();
+
+    function tick(now) {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cúbico
+        const current = startValue + (endValue - startValue) * eased;
+        el.textContent = formatter(current);
+
+        if (progress < 1) {
+            requestAnimationFrame(tick);
+        } else {
+            el.textContent = formatter(endValue);
+            el.dataset.rawValue = String(endValue);
+        }
+    }
+
+    requestAnimationFrame(tick);
+}
+
+// Ondulação de "carimbo" ao tocar num botão circular (ex: novo lançamento)
+function createRipple(event, target) {
+    if (prefersReducedMotion()) return;
+    const rect = target.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const ripple = document.createElement('span');
+    ripple.className = 'fab-ripple';
+    ripple.style.width = ripple.style.height = `${size}px`;
+    ripple.style.left = `${(event.clientX ?? rect.left + rect.width / 2) - rect.left - size / 2}px`;
+    ripple.style.top = `${(event.clientY ?? rect.top + rect.height / 2) - rect.top - size / 2}px`;
+    target.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove());
+}
+
 function renderCalendar(month, year) {
     const daysContainer = document.getElementById('calendar-days');
     const monthYearDisplay = document.getElementById('calendar-month-year');
@@ -63,12 +117,7 @@ function renderCalendar(month, year) {
         daysContainer.appendChild(cell);
     }
 
-    monthDaysCount.textContent = workedCount;
-
-    const dayButtons = document.getElementById('day-buttons');
-    if (workedCount > 0 || Object.keys(workedDays).length > 0) {
-        dayButtons.style.display = 'block';
-    }
+    animateNumber(monthDaysCount, workedCount, (v) => String(Math.round(v)), 420);
 }
 
 function createDayCell(day, year, month, className = '', isWorked = false, isToday = false) {
@@ -89,7 +138,18 @@ function createDayCell(day, year, month, className = '', isWorked = false, isTod
     cell.addEventListener('click', () => {
         if (cell.classList.contains('empty') || cell.classList.contains('other-month')) return;
 
+        const dayButtons = document.getElementById('day-buttons');
+        const wasSelected = cell.classList.contains('selected');
+
         document.querySelectorAll('.calendar-day.selected').forEach(el => el.classList.remove('selected'));
+
+        if (wasSelected) {
+            // Clicar de novo no mesmo dia já selecionado o desmarca.
+            selectedDate = null;
+            dayButtons.style.display = 'none';
+            return;
+        }
+
         cell.classList.add('selected');
 
         selectedDate = {
@@ -101,8 +161,6 @@ function createDayCell(day, year, month, className = '', isWorked = false, isTod
         };
 
         updateSelectedDayInfo(selectedDate);
-
-        const dayButtons = document.getElementById('day-buttons');
         dayButtons.style.display = 'block';
     });
 
@@ -191,15 +249,46 @@ function unmarkDayWorked() {
 }
 
 function changeMonth(delta) {
-    currentMonth += delta;
-    if (currentMonth > 11) {
-        currentMonth = 0;
-        currentYear++;
-    } else if (currentMonth < 0) {
-        currentMonth = 11;
-        currentYear--;
+    const daysContainer = document.getElementById('calendar-days');
+    const reduced = prefersReducedMotion();
+
+    const advance = () => {
+        currentMonth += delta;
+        if (currentMonth > 11) {
+            currentMonth = 0;
+            currentYear++;
+        } else if (currentMonth < 0) {
+            currentMonth = 11;
+            currentYear--;
+        }
+        renderCalendar(currentMonth, currentYear);
+
+        // Trocar de mês invalida a seleção visual anterior — sem célula
+        // marcada, o painel de ações não deve continuar aparecendo.
+        selectedDate = null;
+        const dayButtons = document.getElementById('day-buttons');
+        if (dayButtons) dayButtons.style.display = 'none';
+
+        if (!reduced && daysContainer) {
+            daysContainer.classList.remove('slide-out-left', 'slide-out-right');
+            daysContainer.style.transform = delta > 0 ? 'translateX(16px)' : 'translateX(-16px)';
+            daysContainer.style.opacity = '0';
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    daysContainer.style.transform = '';
+                    daysContainer.style.opacity = '';
+                });
+            });
+        }
+    };
+
+    if (reduced || !daysContainer) {
+        advance();
+        return;
     }
-    renderCalendar(currentMonth, currentYear);
+
+    daysContainer.classList.add(delta > 0 ? 'slide-out-left' : 'slide-out-right');
+    setTimeout(advance, 160);
 }
 
 // ============================================
@@ -219,31 +308,37 @@ function updateDashboard() {
     const totalWorkedDays = Object.keys(workedDays).filter(key => workedDays[key] === true).length;
     const totalGross = totalWorkedDays * dailyRate;
 
-    let totalDiscounts = 0;
+    // Descontos pessoais e valores de terceiros são contados SEPARADAMENTE,
+    // para não se misturarem no cálculo do saldo.
+    let totalPersonalDiscount = 0;
     let totalThirdParty = 0;
 
     transactions.forEach(t => {
         const amount = parseFloat(t.amount) || 0;
         if (t.type === 'personal_discount') {
-            totalDiscounts += amount;
+            totalPersonalDiscount += amount;
         } else if (t.type === 'third_party') {
-            totalDiscounts += amount;
             totalThirdParty += amount;
         }
     });
 
-    const netBalance = totalGross - totalDiscounts;
+    // Saldo líquido: bruto menos SOMENTE os descontos pessoais.
+    const netBalance = totalGross - totalPersonalDiscount;
+    // Saldo real: saldo líquido menos o que precisa ser repassado a terceiros
+    // (subtraído uma única vez, não mais duas).
     const realBalance = netBalance - totalThirdParty;
 
-    document.getElementById('ledger-gross').textContent = formatMoney(totalGross);
-    document.getElementById('ledger-discounts').textContent = `− ${formatMoney(totalDiscounts)}`;
-    document.getElementById('ledger-net').textContent = formatMoney(netBalance);
-    document.getElementById('ledger-real').textContent = formatMoney(realBalance);
+    const signedMoney = (v) => `− ${formatMoney(v)}`;
+
+    animateNumber(document.getElementById('ledger-gross'), totalGross, formatMoney);
+    animateNumber(document.getElementById('ledger-discounts'), totalPersonalDiscount, signedMoney);
+    animateNumber(document.getElementById('ledger-net'), netBalance, formatMoney);
+    animateNumber(document.getElementById('ledger-real'), realBalance, formatMoney, 650);
 
     const thirdRow = document.getElementById('ledger-third-row');
     if (totalThirdParty > 0) {
         thirdRow.style.display = 'flex';
-        document.getElementById('ledger-third-party').textContent = `− ${formatMoney(totalThirdParty)}`;
+        animateNumber(document.getElementById('ledger-third-party'), totalThirdParty, signedMoney);
     } else {
         thirdRow.style.display = 'none';
     }
@@ -275,12 +370,13 @@ function renderTransactions(filter = '') {
         return;
     }
 
-    list.innerHTML = filtered.map(t => {
-        const typeLabel = t.type === 'personal_discount' ? 'Desconto pessoal' : 'Terceiro';
+    list.innerHTML = filtered.map((t, i) => {
+        const typeLabel = t.type === 'personal_discount' ? 'Gasto pessoal' : 'Terceiro';
         const dateFormatted = new Date(t.date).toLocaleDateString('pt-BR');
+        const delay = Math.min(i, 12) * 30;
 
         return `
-            <div class="transaction-item" data-id="${t.id}">
+            <div class="transaction-item" data-id="${t.id}" style="animation-delay:${delay}ms">
                 <div class="transaction-info">
                     <div class="transaction-desc">${t.description}</div>
                     ${t.person ? `<div class="transaction-person">${t.person}</div>` : ''}
@@ -300,12 +396,29 @@ function renderTransactions(filter = '') {
 // TRANSACTIONS CRUD
 // ============================================
 
+function setPersonFieldVisibility(type) {
+    const field = document.getElementById('person-field');
+    const personInput = document.getElementById('modal-person');
+    const isThirdParty = type === 'third_party';
+
+    if (isThirdParty) {
+        field.style.display = 'block';
+        if (!prefersReducedMotion()) {
+            field.classList.remove('reveal');
+            void field.offsetWidth; // força reflow para reiniciar a animação
+            field.classList.add('reveal');
+        }
+    } else {
+        field.style.display = 'none';
+        personInput.value = '';
+    }
+
+    personInput.required = isThirdParty;
+}
+
 function openModal(editData = null) {
     const modal = document.getElementById('modal');
     modal.classList.add('active');
-
-    const personInput = document.getElementById('modal-person');
-    const personLabel = document.getElementById('person-label');
 
     if (editData) {
         document.getElementById('modal-title').textContent = 'Editar movimentação';
@@ -318,13 +431,7 @@ function openModal(editData = null) {
             btn.classList.toggle('active', btn.dataset.type === editData.type);
         });
 
-        if (editData.type === 'third_party') {
-            personLabel.textContent = 'Nome do terceiro *';
-            personInput.placeholder = 'Digite o nome do terceiro';
-        } else {
-            personLabel.textContent = 'Nome (opcional)';
-            personInput.placeholder = 'Digite o nome';
-        }
+        setPersonFieldVisibility(editData.type);
     } else {
         document.getElementById('modal-title').textContent = 'Nova movimentação';
         document.getElementById('modal-description').value = '';
@@ -336,8 +443,7 @@ function openModal(editData = null) {
             btn.classList.toggle('active', index === 0);
         });
 
-        personLabel.textContent = 'Nome (opcional)';
-        personInput.placeholder = 'Digite o nome';
+        setPersonFieldVisibility('personal_discount');
     }
 }
 
@@ -471,7 +577,15 @@ function toggleTheme() {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
-    document.getElementById('theme-toggle').textContent = newTheme === 'dark' ? '☀️' : '🌙';
+
+    const btn = document.getElementById('theme-toggle');
+    btn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+
+    if (!prefersReducedMotion()) {
+        btn.classList.remove('spin');
+        void btn.offsetWidth; // força reflow para reiniciar a animação
+        btn.classList.add('spin');
+    }
 }
 
 // ============================================
@@ -533,21 +647,23 @@ function exportData() {
         .sort((a, b) => new Date(a.date) - new Date(b.date))
         .map((t, index) => ({
             numero: index + 1,
-            tipo: t.type === 'personal_discount' ? 'Desconto Pessoal' : 'Terceiro',
+            tipo: t.type === 'personal_discount' ? 'Gasto Pessoal' : 'Terceiro',
             descricao: t.description,
             pessoa: t.person || '-',
             valor: formatMoney(t.amount),
             data: new Date(t.date).toLocaleDateString('pt-BR')
         }));
 
-    let totalDiscounts = 0, totalThirdParty = 0;
+    // Mesma correção aplicada aqui: descontos pessoais e valores de
+    // terceiros são somados separadamente, sem se misturar.
+    let totalPersonalDiscount = 0, totalThirdParty = 0;
     transactionsRaw.forEach(t => {
         const amount = parseFloat(t.amount) || 0;
-        if (t.type === 'personal_discount') totalDiscounts += amount;
-        else if (t.type === 'third_party') { totalDiscounts += amount; totalThirdParty += amount; }
+        if (t.type === 'personal_discount') totalPersonalDiscount += amount;
+        else if (t.type === 'third_party') totalThirdParty += amount;
     });
     const totalGross = workedDaysList.length * dailyRate;
-    const netBalance = totalGross - totalDiscounts;
+    const netBalance = totalGross - totalPersonalDiscount;
     const realBalance = netBalance - totalThirdParty;
 
     const data = {
@@ -557,7 +673,7 @@ function exportData() {
             valorDiaria: formatMoney(dailyRate),
             diasTrabalhados: workedDaysList.length,
             totalBruto: formatMoney(totalGross),
-            totalDescontos: formatMoney(totalDiscounts),
+            totalGastosPessoais: formatMoney(totalPersonalDiscount),
             totalTerceiros: formatMoney(totalThirdParty),
             saldoLiquido: formatMoney(netBalance),
             saldoReal: formatMoney(realBalance)
@@ -645,7 +761,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-day').addEventListener('click', markDayWorked);
     document.getElementById('remove-day').addEventListener('click', unmarkDayWorked);
 
-    document.getElementById('new-transaction').addEventListener('click', () => openModal());
+    document.getElementById('new-transaction').addEventListener('click', (e) => {
+        createRipple(e, e.currentTarget);
+        openModal();
+    });
     document.getElementById('close-modal').addEventListener('click', closeModal);
     document.getElementById('save-transaction').addEventListener('click', saveTransaction);
 
@@ -657,20 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.btn-type').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-
-            const type = btn.dataset.type;
-            const personLabel = document.getElementById('person-label');
-            const personInput = document.getElementById('modal-person');
-
-            if (type === 'third_party') {
-                personLabel.textContent = 'Nome do terceiro *';
-                personInput.placeholder = 'Digite o nome do terceiro';
-                personInput.required = true;
-            } else {
-                personLabel.textContent = 'Nome (opcional)';
-                personInput.placeholder = 'Digite o nome';
-                personInput.required = false;
-            }
+            setPersonFieldVisibility(btn.dataset.type);
         });
     });
 

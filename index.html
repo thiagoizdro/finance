@@ -86,7 +86,7 @@
                         <strong id="ledger-gross">R$ 0,00</strong>
                     </div>
                     <div class="receipt-row muted">
-                        <span>Descontos</span>
+                        <span>Gastos pessoais</span>
                         <strong id="ledger-discounts">− R$ 0,00</strong>
                     </div>
                     <div class="receipt-row muted" id="ledger-third-row" style="display:none;">
@@ -174,7 +174,7 @@
                         <label>Tipo</label>
                         <div class="btn-group">
                             <button class="btn-type active" data-type="personal_discount">
-                                Desconto pessoal
+                                Gasto pessoal
                             </button>
                             <button class="btn-type" data-type="third_party">
                                 Terceiro
@@ -195,10 +195,9 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label id="person-label" for="modal-person">Nome (opcional)</label>
-                        <input type="text" id="modal-person" placeholder="Digite o nome">
-                        <small class="hint">Preencha apenas se for uma movimentação de terceiro.</small>
+                    <div class="form-group" id="person-field" style="display:none;">
+                        <label for="modal-person">Nome do terceiro *</label>
+                        <input type="text" id="modal-person" placeholder="Digite o nome do terceiro">
                     </div>
 
                     <button id="save-transaction" class="btn-primary btn-full">
