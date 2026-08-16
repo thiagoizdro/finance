@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#233A2E">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Caderneta — Controle de Diárias</title>
+    <title>Caderneta — Controle Financeiro</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -27,11 +27,43 @@
     <div id="toast" class="toast" aria-live="polite"></div>
 
     <div id="app">
-        <!-- Tela de Configuração -->
-        <div id="config-screen" class="screen active">
+        <!-- Tela de Seleção de Modalidade -->
+        <div id="mode-selection-screen" class="screen active">
             <div class="container container-narrow">
                 <div class="intro">
                     <span class="eyebrow">Caderneta digital</span>
+                    <div class="stamp-mark" aria-hidden="true">R$</div>
+                    <h1>Como você quer controlar?</h1>
+                    <p>Escolha o modo que melhor se adapta à sua realidade financeira.</p>
+                </div>
+
+                <div class="mode-cards">
+                    <button class="mode-card" data-mode="daily">
+                        <div class="mode-icon">📅</div>
+                        <div class="mode-content">
+                            <h2>Diária</h2>
+                            <p>Controle por dia trabalhado, com valor definido por dia.</p>
+                            <span class="mode-tag">Recomendado para freelancers</span>
+                        </div>
+                    </button>
+
+                    <button class="mode-card" data-mode="monthly">
+                        <div class="mode-icon">💼</div>
+                        <div class="mode-content">
+                            <h2>Salário Mensal</h2>
+                            <p>Controle simplificado com base no salário do mês.</p>
+                            <span class="mode-tag">Recomendado para CLT</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Configuração para Diária -->
+        <div id="daily-config-screen" class="screen">
+            <div class="container container-narrow">
+                <div class="intro">
+                    <span class="eyebrow">Modo Diária</span>
                     <div class="stamp-mark" aria-hidden="true">R$</div>
                     <h1>Qual é a sua diária?</h1>
                     <p>Esse valor é a base de todo o seu controle — vamos usá-lo para calcular o que você ganha a cada dia marcado.</p>
@@ -47,8 +79,47 @@
                         <small class="hint">Você pode alterar esse valor depois, nas configurações.</small>
                     </div>
 
-                    <button id="save-config" class="btn-primary">
+                    <button id="save-daily-config" class="btn-primary">
                         Começar a registrar
+                    </button>
+                    <button id="back-to-modes-daily" class="btn-secondary" style="margin-top: 10px;">
+                        ← Voltar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Configuração para Salário Mensal -->
+        <div id="monthly-config-screen" class="screen">
+            <div class="container container-narrow">
+                <div class="intro">
+                    <span class="eyebrow">Modo Salário Mensal</span>
+                    <div class="stamp-mark" aria-hidden="true">💼</div>
+                    <h1>Qual é o seu salário?</h1>
+                    <p>Informe o valor total que você recebe por mês. A partir dele, vamos controlar seus gastos.</p>
+                </div>
+
+                <div class="card ledger-card">
+                    <div class="form-group">
+                        <label for="salary-input">Valor do salário mensal</label>
+                        <div class="input-affix">
+                            <span class="affix">R$</span>
+                            <input type="number" id="salary-input" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
+                        </div>
+                        <small class="hint">Este será o valor base para todo o mês.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="salary-month-input">Mês de referência</label>
+                        <input type="month" id="salary-month-input">
+                        <small class="hint">Opcional: define o mês ao qual este salário se refere.</small>
+                    </div>
+
+                    <button id="save-monthly-config" class="btn-primary">
+                        Começar a controlar
+                    </button>
+                    <button id="back-to-modes-monthly" class="btn-secondary" style="margin-top: 10px;">
+                        ← Voltar
                     </button>
                 </div>
             </div>
@@ -60,10 +131,11 @@
                 <!-- Header -->
                 <div class="dashboard-header">
                     <div class="header-text">
-                        <span class="eyebrow">Caderneta digital</span>
+                        <span class="eyebrow" id="dashboard-eyebrow">Caderneta digital</span>
                         <h1 id="work-info">0 dias · R$ 0,00/dia</h1>
                     </div>
                     <div class="dashboard-actions" role="toolbar" aria-label="Ações">
+                        <button id="change-mode-btn" class="btn-icon" title="Mudar modo" aria-label="Mudar modo">🔄</button>
                         <button id="theme-toggle" class="btn-icon" title="Alterar tema" aria-label="Alterar tema">🌙</button>
                         <button id="notifications-btn" class="btn-icon" title="Ativar lembretes" aria-label="Ativar lembretes">🔔</button>
                         <button id="export-backup-btn" class="btn-icon" title="Exportar backup" aria-label="Exportar backup">📤</button>
@@ -74,38 +146,55 @@
 
                 <div class="search-bar">
                     <span class="search-icon" aria-hidden="true">🔍</span>
-                    <input type="search" id="transaction-search" placeholder="Buscar por descrição ou nome" autocomplete="off">
+                    <input type="search" id="transaction-search" placeholder="Buscar por descrição" autocomplete="off">
                 </div>
 
                 <!-- Resumo (recibo) -->
                 <div class="card receipt-card">
                     <div class="receipt-perf" aria-hidden="true"></div>
-                    <div class="receipt-title">Resumo do período</div>
-                    <div class="receipt-row">
-                        <span>Total bruto</span>
-                        <strong id="ledger-gross">R$ 0,00</strong>
+                    <div class="receipt-title" id="receipt-title">Resumo do período</div>
+                    
+                    <!-- Seção para modo Diária -->
+                    <div id="daily-summary">
+                        <div class="receipt-row">
+                            <span>Total bruto</span>
+                            <strong id="ledger-gross">R$ 0,00</strong>
+                        </div>
+                        <div class="receipt-row muted">
+                            <span>Gastos pessoais</span>
+                            <strong id="ledger-discounts">− R$ 0,00</strong>
+                        </div>
+                        <div class="receipt-row muted" id="ledger-third-row" style="display:none;">
+                            <span>Repassado a terceiros</span>
+                            <strong id="ledger-third-party">− R$ 0,00</strong>
+                        </div>
                     </div>
-                    <div class="receipt-row muted">
-                        <span>Gastos pessoais</span>
-                        <strong id="ledger-discounts">− R$ 0,00</strong>
+
+                    <!-- Seção para modo Salário Mensal -->
+                    <div id="monthly-summary" style="display:none;">
+                        <div class="receipt-row">
+                            <span>Salário do mês</span>
+                            <strong id="monthly-salary-display">R$ 0,00</strong>
+                        </div>
+                        <div class="receipt-row muted">
+                            <span>Total de gastos</span>
+                            <strong id="monthly-expenses">− R$ 0,00</strong>
+                        </div>
                     </div>
-                    <div class="receipt-row muted" id="ledger-third-row" style="display:none;">
-                        <span>Repassado a terceiros</span>
-                        <strong id="ledger-third-party">− R$ 0,00</strong>
-                    </div>
+
                     <div class="receipt-divider" aria-hidden="true"></div>
                     <div class="receipt-row total">
-                        <span>Saldo líquido</span>
+                        <span id="balance-label">Saldo líquido</span>
                         <strong id="ledger-net">R$ 0,00</strong>
                     </div>
-                    <div class="receipt-row total gold">
+                    <div class="receipt-row total gold" id="real-balance-row">
                         <span>Saldo real (seu)</span>
                         <strong id="ledger-real">R$ 0,00</strong>
                     </div>
                 </div>
 
-                <!-- CALENDÁRIO -->
-                <div class="calendar-section">
+                <!-- CALENDÁRIO (apenas modo diária) -->
+                <div class="calendar-section" id="calendar-section">
                     <div class="card calendar-card">
                         <div class="calendar-header">
                             <button id="prev-month" class="btn-icon" aria-label="Mês anterior">◀</button>
@@ -137,7 +226,7 @@
                     </div>
                 </div>
 
-                <!-- Botões Dias Trabalhados -->
+                <!-- Botões Dias Trabalhados (apenas modo diária) -->
                 <div class="day-buttons" id="day-buttons" style="display:none;">
                     <div class="day-info">
                         Dia selecionado: <strong id="selected-date-display">--/--/----</strong>
@@ -150,7 +239,7 @@
 
                 <!-- Lista de Transações -->
                 <div class="transactions-section">
-                    <h2>Últimos lançamentos</h2>
+                    <h2 id="transactions-title">Últimos lançamentos</h2>
                     <div id="transactions-list"></div>
                 </div>
             </div>
@@ -170,9 +259,9 @@
                     <button id="close-modal" class="btn-close" aria-label="Fechar">✕</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
+                    <div class="form-group" id="type-group">
                         <label>Tipo</label>
-                        <div class="btn-group">
+                        <div class="btn-group" id="type-buttons">
                             <button class="btn-type active" data-type="personal_discount">
                                 Gasto pessoal
                             </button>

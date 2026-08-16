@@ -5,6 +5,7 @@
 let config = JSON.parse(localStorage.getItem('config') || '{}');
 let transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
 let editingId = null;
+let currentMode = config.mode || null; // 'daily' ou 'monthly'
 
 // ============================================
 // CALENDÁRIO
@@ -23,9 +24,6 @@ function prefersReducedMotion() {
     return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// Anima um número de um valor antigo até um novo, tipo contador de
-// máquina de somar. Guarda o último valor no próprio elemento (dataset)
-// para saber de onde partir na próxima chamada.
 function animateNumber(el, endValue, formatter, duration = 550) {
     if (!el) return;
     const startValue = parseFloat(el.dataset.rawValue || '0');
@@ -55,7 +53,6 @@ function animateNumber(el, endValue, formatter, duration = 550) {
     requestAnimationFrame(tick);
 }
 
-// Ondulação de "carimbo" ao tocar num botão circular (ex: novo lançamento)
 function createRipple(event, target) {
     if (prefersReducedMotion()) return;
     const rect = target.getBoundingClientRect();
@@ -73,6 +70,8 @@ function renderCalendar(month, year) {
     const daysContainer = document.getElementById('calendar-days');
     const monthYearDisplay = document.getElementById('calendar-month-year');
     const monthDaysCount = document.getElementById('month-days-count');
+
+    if (!daysContainer) return;
 
     const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
                         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -144,7 +143,6 @@ function createDayCell(day, year, month, className = '', isWorked = false, isTod
         document.querySelectorAll('.calendar-day.selected').forEach(el => el.classList.remove('selected'));
 
         if (wasSelected) {
-            // Clicar de novo no mesmo dia já selecionado o desmarca.
             selectedDate = null;
             dayButtons.style.display = 'none';
             return;
@@ -250,6 +248,8 @@ function unmarkDayWorked() {
 
 function changeMonth(delta) {
     const daysContainer = document.getElementById('calendar-days');
+    if (!daysContainer) return;
+    
     const reduced = prefersReducedMotion();
 
     const advance = () => {
@@ -263,8 +263,6 @@ function changeMonth(delta) {
         }
         renderCalendar(currentMonth, currentYear);
 
-        // Trocar de mês invalida a seleção visual anterior — sem célula
-        // marcada, o painel de ações não deve continuar aparecendo.
         selectedDate = null;
         const dayButtons = document.getElementById('day-buttons');
         if (dayButtons) dayButtons.style.display = 'none';
@@ -292,6 +290,92 @@ function changeMonth(delta) {
 }
 
 // ============================================
+// MODE MANAGEMENT
+// ============================================
+
+function selectMode(mode) {
+    currentMode = mode;
+    config.mode = mode;
+    localStorage.setItem('config', JSON.stringify(config));
+    
+    // Esconder todas as telas
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    
+    // Mostrar tela de configuração apropriada
+    if (mode === 'daily') {
+        document.getElementById('daily-config-screen').classList.add('active');
+    } else if (mode === 'monthly') {
+        document.getElementById('monthly-config-screen').classList.add('active');
+        
+        // Definir mês atual como padrão
+        const today = new Date();
+        const monthInput = document.getElementById('salary-month-input');
+        if (monthInput) {
+            monthInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        }
+    }
+}
+
+function switchMode() {
+    if (confirm('Mudar o modo de controle? Os dados existentes serão preservados.')) {
+        // Limpar config atual
+        config = {};
+        localStorage.setItem('config', JSON.stringify(config));
+        localStorage.removeItem('workedDays');
+        localStorage.removeItem('transactions');
+        
+        // Mostrar tela de seleção
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('mode-selection-screen').classList.add('active');
+    }
+}
+
+function applyModeToInterface() {
+    const isMonthly = currentMode === 'monthly';
+    
+    // Elementos do dashboard
+    const dashboardEyebrow = document.getElementById('dashboard-eyebrow');
+    const workInfo = document.getElementById('work-info');
+    const receiptTitle = document.getElementById('receipt-title');
+    const dailySummary = document.getElementById('daily-summary');
+    const monthlySummary = document.getElementById('monthly-summary');
+    const balanceLabel = document.getElementById('balance-label');
+    const realBalanceRow = document.getElementById('real-balance-row');
+    const calendarSection = document.getElementById('calendar-section');
+    const transactionsTitle = document.getElementById('transactions-title');
+    const searchInput = document.getElementById('transaction-search');
+    const typeGroup = document.getElementById('type-group');
+    
+    if (isMonthly) {
+        dashboardEyebrow.textContent = 'Caderneta digital · Mensal';
+        receiptTitle.textContent = 'Resumo do mês';
+        dailySummary.style.display = 'none';
+        monthlySummary.style.display = 'block';
+        balanceLabel.textContent = 'Saldo disponível';
+        realBalanceRow.style.display = 'none';
+        calendarSection.style.display = 'none';
+        transactionsTitle.textContent = 'Gastos do mês';
+        searchInput.placeholder = 'Buscar por descrição';
+        typeGroup.style.display = 'none';
+        
+        // Atualizar info do salário
+        const monthlySalary = config.monthlySalary || 0;
+        workInfo.textContent = `Salário: ${formatMoney(monthlySalary)}`;
+    } else {
+        dashboardEyebrow.textContent = 'Caderneta digital';
+        receiptTitle.textContent = 'Resumo do período';
+        dailySummary.style.display = 'block';
+        monthlySummary.style.display = 'none';
+        balanceLabel.textContent = 'Saldo líquido';
+        realBalanceRow.style.display = 'flex';
+        calendarSection.style.display = 'block';
+        transactionsTitle.textContent = 'Últimos lançamentos';
+        searchInput.placeholder = 'Buscar por descrição ou nome';
+        typeGroup.style.display = 'block';
+    }
+}
+
+// ============================================
 // DASHBOARD
 // ============================================
 
@@ -301,15 +385,25 @@ function formatMoney(value) {
 
 function updateDashboard() {
     const config = JSON.parse(localStorage.getItem('config') || '{}');
-    const workedDays = JSON.parse(localStorage.getItem('workedDays') || '{}');
     const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+    currentMode = config.mode || 'daily';
+
+    if (currentMode === 'monthly') {
+        updateMonthlyDashboard(config, transactions);
+    } else {
+        updateDailyDashboard(config, transactions);
+    }
+    
+    renderTransactions(document.getElementById('transaction-search')?.value || '');
+}
+
+function updateDailyDashboard(config, transactions) {
+    const workedDays = JSON.parse(localStorage.getItem('workedDays') || '{}');
     const dailyRate = parseFloat(config.rate) || 0;
 
     const totalWorkedDays = Object.keys(workedDays).filter(key => workedDays[key] === true).length;
     const totalGross = totalWorkedDays * dailyRate;
 
-    // Descontos pessoais e valores de terceiros são contados SEPARADAMENTE,
-    // para não se misturarem no cálculo do saldo.
     let totalPersonalDiscount = 0;
     let totalThirdParty = 0;
 
@@ -322,10 +416,7 @@ function updateDashboard() {
         }
     });
 
-    // Saldo líquido: bruto menos SOMENTE os descontos pessoais.
     const netBalance = totalGross - totalPersonalDiscount;
-    // Saldo real: saldo líquido menos o que precisa ser repassado a terceiros
-    // (subtraído uma única vez, não mais duas).
     const realBalance = netBalance - totalThirdParty;
 
     const signedMoney = (v) => `− ${formatMoney(v)}`;
@@ -344,13 +435,33 @@ function updateDashboard() {
     }
 
     document.getElementById('work-info').textContent = `${totalWorkedDays} ${totalWorkedDays === 1 ? 'dia' : 'dias'} · ${formatMoney(dailyRate)}/dia`;
+}
 
-    renderTransactions(document.getElementById('transaction-search')?.value || '');
+function updateMonthlyDashboard(config, transactions) {
+    const monthlySalary = parseFloat(config.monthlySalary) || 0;
+    
+    let totalExpenses = 0;
+    transactions.forEach(t => {
+        const amount = parseFloat(t.amount) || 0;
+        if (t.type === 'personal_discount') {
+            totalExpenses += amount;
+        }
+    });
+
+    const netBalance = monthlySalary - totalExpenses;
+    const signedMoney = (v) => `− ${formatMoney(v)}`;
+
+    animateNumber(document.getElementById('monthly-salary-display'), monthlySalary, formatMoney);
+    animateNumber(document.getElementById('monthly-expenses'), totalExpenses, signedMoney);
+    animateNumber(document.getElementById('ledger-net'), netBalance, formatMoney);
+    
+    document.getElementById('work-info').textContent = `Salário: ${formatMoney(monthlySalary)}`;
 }
 
 function renderTransactions(filter = '') {
     const list = document.getElementById('transactions-list');
     const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+    const isMonthly = currentMode === 'monthly';
 
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -371,7 +482,7 @@ function renderTransactions(filter = '') {
     }
 
     list.innerHTML = filtered.map((t, i) => {
-        const typeLabel = t.type === 'personal_discount' ? 'Gasto pessoal' : 'Terceiro';
+        const typeLabel = isMonthly ? 'Gasto' : (t.type === 'personal_discount' ? 'Gasto pessoal' : 'Terceiro');
         const dateFormatted = new Date(t.date).toLocaleDateString('pt-BR');
         const delay = Math.min(i, 12) * 30;
 
@@ -405,7 +516,7 @@ function setPersonFieldVisibility(type) {
         field.style.display = 'block';
         if (!prefersReducedMotion()) {
             field.classList.remove('reveal');
-            void field.offsetWidth; // força reflow para reiniciar a animação
+            void field.offsetWidth;
             field.classList.add('reveal');
         }
     } else {
@@ -419,6 +530,15 @@ function setPersonFieldVisibility(type) {
 function openModal(editData = null) {
     const modal = document.getElementById('modal');
     modal.classList.add('active');
+    
+    const isMonthly = currentMode === 'monthly';
+    const typeGroup = document.getElementById('type-group');
+    
+    if (isMonthly) {
+        typeGroup.style.display = 'none';
+    } else {
+        typeGroup.style.display = 'block';
+    }
 
     if (editData) {
         document.getElementById('modal-title').textContent = 'Editar movimentação';
@@ -427,11 +547,12 @@ function openModal(editData = null) {
         document.getElementById('modal-person').value = editData.person || '';
         editingId = editData.id;
 
-        document.querySelectorAll('.btn-type').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.type === editData.type);
-        });
-
-        setPersonFieldVisibility(editData.type);
+        if (!isMonthly) {
+            document.querySelectorAll('.btn-type').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === editData.type);
+            });
+            setPersonFieldVisibility(editData.type);
+        }
     } else {
         document.getElementById('modal-title').textContent = 'Nova movimentação';
         document.getElementById('modal-description').value = '';
@@ -439,11 +560,12 @@ function openModal(editData = null) {
         document.getElementById('modal-person').value = '';
         editingId = null;
 
-        document.querySelectorAll('.btn-type').forEach((btn, index) => {
-            btn.classList.toggle('active', index === 0);
-        });
-
-        setPersonFieldVisibility('personal_discount');
+        if (!isMonthly) {
+            document.querySelectorAll('.btn-type').forEach((btn, index) => {
+                btn.classList.toggle('active', index === 0);
+            });
+            setPersonFieldVisibility('personal_discount');
+        }
     }
 }
 
@@ -455,7 +577,11 @@ function closeModal() {
 function saveTransaction() {
     const description = document.getElementById('modal-description').value.trim();
     const amount = parseFloat(document.getElementById('modal-amount').value);
-    const type = document.querySelector('.btn-type.active')?.dataset.type || 'personal_discount';
+    const isMonthly = currentMode === 'monthly';
+    
+    // No modo mensal, o tipo é sempre personal_discount
+    const type = isMonthly ? 'personal_discount' : 
+                 (document.querySelector('.btn-type.active')?.dataset.type || 'personal_discount');
     const person = document.getElementById('modal-person').value.trim();
 
     if (!description) {
@@ -525,10 +651,10 @@ function deleteTransaction(id) {
 }
 
 // ============================================
-// CONFIGURAÇÃO INICIAL
+// CONFIGURAÇÃO
 // ============================================
 
-function saveConfig() {
+function saveDailyConfig() {
     const rate = parseFloat(document.getElementById('rate-input').value);
 
     if (isNaN(rate) || rate <= 0) {
@@ -536,10 +662,11 @@ function saveConfig() {
         return;
     }
 
-    const config = { rate: rate };
+    const config = { mode: 'daily', rate: rate };
     localStorage.setItem('config', JSON.stringify(config));
+    currentMode = 'daily';
 
-    document.getElementById('config-screen').classList.remove('active');
+    document.getElementById('daily-config-screen').classList.remove('active');
     document.getElementById('dashboard-screen').classList.add('active');
 
     if (!localStorage.getItem('workedDays')) {
@@ -549,8 +676,39 @@ function saveConfig() {
         localStorage.setItem('transactions', '[]');
     }
 
+    applyModeToInterface();
     updateDashboard();
     renderCalendar(currentMonth, currentYear);
+    showToast('Configuração salva.', 'success');
+}
+
+function saveMonthlyConfig() {
+    const salary = parseFloat(document.getElementById('salary-input').value);
+
+    if (isNaN(salary) || salary <= 0) {
+        showToast('Informe um valor de salário válido.', 'error');
+        return;
+    }
+
+    const monthInput = document.getElementById('salary-month-input').value;
+    const config = { 
+        mode: 'monthly', 
+        monthlySalary: salary,
+        referenceMonth: monthInput || undefined
+    };
+    
+    localStorage.setItem('config', JSON.stringify(config));
+    currentMode = 'monthly';
+
+    document.getElementById('monthly-config-screen').classList.remove('active');
+    document.getElementById('dashboard-screen').classList.add('active');
+
+    if (!localStorage.getItem('transactions')) {
+        localStorage.setItem('transactions', '[]');
+    }
+
+    applyModeToInterface();
+    updateDashboard();
     showToast('Configuração salva.', 'success');
 }
 
@@ -583,7 +741,7 @@ function toggleTheme() {
 
     if (!prefersReducedMotion()) {
         btn.classList.remove('spin');
-        void btn.offsetWidth; // força reflow para reiniciar a animação
+        void btn.offsetWidth;
         btn.classList.add('spin');
     }
 }
@@ -628,7 +786,7 @@ function requestNotifications() {
 }
 
 // ============================================
-// BACKUP — exportar (organizado e legível)
+// BACKUP — exportar
 // ============================================
 
 function exportData() {
@@ -636,51 +794,10 @@ function exportData() {
     const workedDaysRaw = JSON.parse(localStorage.getItem('workedDays') || '{}');
     const transactionsRaw = JSON.parse(localStorage.getItem('transactions') || '[]');
 
-    const dailyRate = parseFloat(config.rate) || 0;
-
-    const workedDaysList = Object.keys(workedDaysRaw)
-        .filter(key => workedDaysRaw[key] === true)
-        .sort()
-        .map(key => new Date(key + 'T00:00:00').toLocaleDateString('pt-BR'));
-
-    const movimentacoes = [...transactionsRaw]
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
-        .map((t, index) => ({
-            numero: index + 1,
-            tipo: t.type === 'personal_discount' ? 'Gasto Pessoal' : 'Terceiro',
-            descricao: t.description,
-            pessoa: t.person || '-',
-            valor: formatMoney(t.amount),
-            data: new Date(t.date).toLocaleDateString('pt-BR')
-        }));
-
-    // Mesma correção aplicada aqui: descontos pessoais e valores de
-    // terceiros são somados separadamente, sem se misturar.
-    let totalPersonalDiscount = 0, totalThirdParty = 0;
-    transactionsRaw.forEach(t => {
-        const amount = parseFloat(t.amount) || 0;
-        if (t.type === 'personal_discount') totalPersonalDiscount += amount;
-        else if (t.type === 'third_party') totalThirdParty += amount;
-    });
-    const totalGross = workedDaysList.length * dailyRate;
-    const netBalance = totalGross - totalPersonalDiscount;
-    const realBalance = netBalance - totalThirdParty;
-
     const data = {
         app: 'Caderneta',
         exportadoEm: new Date().toLocaleString('pt-BR'),
-        resumoFinanceiro: {
-            valorDiaria: formatMoney(dailyRate),
-            diasTrabalhados: workedDaysList.length,
-            totalBruto: formatMoney(totalGross),
-            totalGastosPessoais: formatMoney(totalPersonalDiscount),
-            totalTerceiros: formatMoney(totalThirdParty),
-            saldoLiquido: formatMoney(netBalance),
-            saldoReal: formatMoney(realBalance)
-        },
-        diasTrabalhados: workedDaysList,
-        movimentacoes: movimentacoes,
-        // dados originais, usados apenas para restaurar o backup
+        modo: config.mode === 'monthly' ? 'Salário Mensal' : 'Diária',
         dadosBrutos: {
             config: config,
             workedDays: workedDaysRaw,
@@ -700,7 +817,7 @@ function exportData() {
 }
 
 // ============================================
-// BACKUP — restaurar (compatível com formato novo e antigo)
+// BACKUP — restaurar
 // ============================================
 
 function restoreBackup() {
@@ -737,30 +854,70 @@ function restoreBackup() {
 
 document.addEventListener('DOMContentLoaded', () => {
     const config = JSON.parse(localStorage.getItem('config') || '{}');
-
-    if (config.rate) {
-        document.getElementById('config-screen').classList.remove('active');
-        document.getElementById('dashboard-screen').classList.add('active');
-        updateDashboard();
-        renderCalendar(currentMonth, currentYear);
-    }
+    currentMode = config.mode || null;
 
     const savedTheme = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
     document.getElementById('theme-toggle').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
 
-    document.getElementById('save-config').addEventListener('click', saveConfig);
+    // Configurar navegação
+    if (currentMode) {
+        // Já existe configuração
+        if (currentMode === 'daily' && config.rate) {
+            showDashboard();
+        } else if (currentMode === 'monthly' && config.monthlySalary) {
+            showDashboard();
+        } else {
+            // Config incompleta
+            document.getElementById('mode-selection-screen').classList.add('active');
+        }
+    } else {
+        // Primeira vez
+        document.getElementById('mode-selection-screen').classList.add('active');
+    }
+
+    // Event listeners para seleção de modo
+    document.querySelectorAll('.mode-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const mode = card.dataset.mode;
+            selectMode(mode);
+        });
+    });
+
+    // Event listeners para configuração
+    document.getElementById('save-daily-config').addEventListener('click', saveDailyConfig);
+    document.getElementById('save-monthly-config').addEventListener('click', saveMonthlyConfig);
+    
+    document.getElementById('back-to-modes-daily').addEventListener('click', () => {
+        document.getElementById('daily-config-screen').classList.remove('active');
+        document.getElementById('mode-selection-screen').classList.add('active');
+    });
+    
+    document.getElementById('back-to-modes-monthly').addEventListener('click', () => {
+        document.getElementById('monthly-config-screen').classList.remove('active');
+        document.getElementById('mode-selection-screen').classList.add('active');
+    });
+
+    // Event listeners para ações do dashboard
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
     document.getElementById('notifications-btn').addEventListener('click', requestNotifications);
     document.getElementById('export-backup-btn').addEventListener('click', exportData);
     document.getElementById('restore-backup-btn').addEventListener('click', restoreBackup);
     document.getElementById('reset-btn').addEventListener('click', resetApp);
+    document.getElementById('change-mode-btn').addEventListener('click', switchMode);
 
-    document.getElementById('prev-month').addEventListener('click', () => changeMonth(-1));
-    document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
-    document.getElementById('add-day').addEventListener('click', markDayWorked);
-    document.getElementById('remove-day').addEventListener('click', unmarkDayWorked);
+    // Event listeners para calendário (apenas modo diária)
+    const prevMonthBtn = document.getElementById('prev-month');
+    const nextMonthBtn = document.getElementById('next-month');
+    const addDayBtn = document.getElementById('add-day');
+    const removeDayBtn = document.getElementById('remove-day');
+    
+    if (prevMonthBtn) prevMonthBtn.addEventListener('click', () => changeMonth(-1));
+    if (nextMonthBtn) nextMonthBtn.addEventListener('click', () => changeMonth(1));
+    if (addDayBtn) addDayBtn.addEventListener('click', markDayWorked);
+    if (removeDayBtn) removeDayBtn.addEventListener('click', unmarkDayWorked);
 
+    // Event listeners para transações
     document.getElementById('new-transaction').addEventListener('click', (e) => {
         createRipple(e, e.currentTarget);
         openModal();
@@ -772,6 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === e.currentTarget) closeModal();
     });
 
+    // Event listeners para botões de tipo
     document.querySelectorAll('.btn-type').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.btn-type').forEach(b => b.classList.remove('active'));
@@ -780,10 +938,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Event listeners para busca
     document.getElementById('transaction-search').addEventListener('input', (e) => {
         renderTransactions(e.target.value);
     });
 
+    // Event listeners para teclado
     document.getElementById('modal-amount').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') saveTransaction();
     });
@@ -793,6 +953,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('rate-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') saveConfig();
+        if (e.key === 'Enter') saveDailyConfig();
+    });
+
+    document.getElementById('salary-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveMonthlyConfig();
     });
 });
+
+function showDashboard() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('dashboard-screen').classList.add('active');
+    applyModeToInterface();
+    updateDashboard();
+    
+    if (currentMode === 'daily') {
+        renderCalendar(currentMonth, currentYear);
+    }
+}
